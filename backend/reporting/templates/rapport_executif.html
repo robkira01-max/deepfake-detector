@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+<meta charset="UTF-8">
+<title>Résumé exécutif / Executive Summary — {{ report_number }}</title>
+<style>
+  @page {
+    size: letter; margin: 2cm 2cm 2.5cm 2cm;
+    @top-center { content: "RÉSUMÉ EXÉCUTIF / EXECUTIVE SUMMARY — USAGE JUDICIAIRE / FOR COURT USE"; font-size: 6.5pt; color: #999; font-family: Arial, sans-serif; }
+    @bottom-left { content: "{{ report_number }}"; font-size: 7pt; color: #666; font-family: monospace; }
+    @bottom-right { content: "Page " counter(page) " / " counter(pages); font-size: 7pt; color: #666; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; color: #1a1a1a; }
+  .header { background: #1B2A4A; color: #fff; padding: 18px 22px; margin-bottom: 18px; }
+  .header h1 { font-size: 15pt; font-weight: bold; }
+  .header h1 span { display: block; font-size: 13pt; color: #CCDDFF; margin-top: 2px; }
+  .header .sub { font-size: 8pt; opacity: .75; margin-top: 5px; }
+  .header .rnum { font-family: monospace; font-size: 9pt; float: right; opacity: .9; }
+  .verdict-big { text-align: center; padding: 18px; margin: 14px 0; border-radius: 6px; page-break-inside: avoid; }
+  .verdict-big.authentic { background: #D1FAE5; border: 3px solid #18794E; }
+  .verdict-big.deepfake  { background: #FEE2E2; border: 3px solid #B91C1C; }
+  .verdict-big.undetermined { background: #FEF3C7; border: 3px solid #B45309; }
+  .verdict-big .vfr { font-size: 22pt; font-weight: bold; }
+  .verdict-big .ven { font-size: 16pt; font-weight: bold; margin-top: 3px; }
+  .authentic .vfr, .authentic .ven { color: #18794E; }
+  .deepfake  .vfr, .deepfake  .ven { color: #B91C1C; }
+  .undetermined .vfr, .undetermined .ven { color: #B45309; }
+  .verdict-big .vsub { font-size: 10pt; color: #444; margin-top: 6px; }
+  .two-col { display: flex; gap: 16px; margin: 12px 0; }
+  .col { flex: 1; }
+  .card { border: 1.5px solid #DDE3F0; border-radius: 6px; padding: 13px 15px; }
+  .card h3 { font-size: 9.5pt; text-transform: uppercase; color: #1B2A4A; letter-spacing: .05em; border-bottom: 1px solid #DDE3F0; padding-bottom: 5px; margin-bottom: 9px; }
+  .card h3 span { font-style: italic; text-transform: none; font-size: 9pt; color: #2D4270; }
+  .kv { display: flex; justify-content: space-between; font-size: 10pt; padding: 3px 0; border-bottom: 1px solid #F0F2F8; }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: #555; font-size: 9.5pt; }
+  .kv .v { font-weight: bold; font-size: 9.5pt; }
+  .comp-row { display: flex; align-items: center; gap: 8px; font-size: 9.5pt; margin: 5px 0; }
+  .comp-label { width: 160px; flex-shrink: 0; color: #444; }
+  .comp-bar-out { flex: 1; height: 8px; background: #EEE; border-radius: 4px; overflow: hidden; }
+  .comp-bar-in { height: 100%; border-radius: 4px; }
+  .comp-val { width: 36px; text-align: right; font-weight: bold; font-size: 9pt; }
+  .bi-block { display: flex; gap: 0; border: 1px solid #DDE3F0; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+  .bi-fr { flex: 1; padding: 10px 13px; background: #F8FAFF; border-right: 1px solid #DDE3F0; }
+  .bi-en { flex: 1; padding: 10px 13px; background: #FFFFF8; }
+  .bi-lang { font-size: 7pt; text-transform: uppercase; letter-spacing: .08em; font-weight: bold; margin-bottom: 4px; }
+  .bi-fr .bi-lang { color: #003DA5; } .bi-en .bi-lang { color: #C8102E; }
+  .hash-box { font-family: monospace; font-size: 8pt; background: #F8F9FB; border: 1px solid #DDE3F0; padding: 7px 11px; border-radius: 4px; word-break: break-all; margin-top: 7px; }
+  .warn { font-size: 9pt; color: #6B4A00; background: #FEF3C7; border-left: 3px solid #B45309; padding: 7px 11px; margin: 8px 0; border-radius: 0 4px 4px 0; }
+  .sig-line { border-top: 1px solid #1B2A4A; margin-top: 48px; padding-top: 5px; font-size: 9pt; color: #555; }
+  table.info { width:100%; border-collapse: collapse; font-size:10pt; }
+  table.info td { padding: 5px 8px; border-bottom: 1px solid #EEF; }
+  table.info td:first-child { color:#555; width:40%; }
+  .hash-cell { font-family:monospace; font-size:8.5pt; word-break:break-all; }
+  .bilabel { display:block; font-size:8pt; color:#888; font-style:italic; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="rnum">{{ report_number }}</span>
+  <h1>Résumé exécutif — Analyse deepfake<span>Executive Summary — Deepfake Analysis</span></h1>
+  <div class="sub">
+    DeepfakeDetector Canada &nbsp;|&nbsp; {{ generated_at }} &nbsp;|&nbsp; Dossier / File: {{ case.case_number }}<br>
+    Loi sur les langues officielles L.R.C. 1985, ch. 31 · Official Languages Act R.S.C. 1985, c. 31
+  </div>
+</div>
+
+{% set verdict_class = 'authentic' if analysis.verdict == 'AUTHENTIQUE' else ('deepfake' if analysis.verdict == 'DEEPFAKE DÉTECTÉ' else 'undetermined') %}
+{% set verdict_en = 'AUTHENTIC' if analysis.verdict == 'AUTHENTIQUE' else ('DEEPFAKE DETECTED' if analysis.verdict == 'DEEPFAKE DÉTECTÉ' else 'INCONCLUSIVE') %}
+<div class="verdict-big {{ verdict_class }}">
+  <div class="vfr">{{ analysis.verdict }}</div>
+  <div class="ven">{{ verdict_en }}</div>
+  <div class="vsub">
+    Score de risque / Risk score : <strong>{{ "%.1f"|format(analysis.final_score * 100) }}%</strong><br>
+    IC 95% / 95% CI : [{{ "%.1f"|format(analysis.confidence_low * 100) }}%, {{ "%.1f"|format(analysis.confidence_high * 100) }}%]
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="col">
+    <div class="card">
+      <h3>Dossier <span>/ Case</span></h3>
+      <div class="kv"><span class="k">N° dossier / File No.</span><span class="v">{{ case.case_number }}</span></div>
+      <div class="kv"><span class="k">Titre / Title</span><span class="v" style="font-size:9pt">{{ case.title }}</span></div>
+      <div class="kv"><span class="k">Juridiction / Jurisdiction</span><span class="v">{{ case.jurisdiction | upper }}</span></div>
+      {% if case.court_reference %}<div class="kv"><span class="k">Réf. tribunal / Court Ref.</span><span class="v">{{ case.court_reference }}</span></div>{% endif %}
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <h3>Fichier analysé <span>/ File Analyzed</span></h3>
+      <div class="kv"><span class="k">Nom / Name</span><span class="v" style="font-size:9pt">{{ media_file.original_filename }}</span></div>
+      <div class="kv"><span class="k">Taille / Size</span><span class="v">{{ media_file.file_size_bytes | filesizeformat }}</span></div>
+      <div class="kv"><span class="k">Type MIME</span><span class="v" style="font-size:9pt">{{ media_file.mime_type }}</span></div>
+      <div class="kv"><span class="k">Durée analyse / Duration</span><span class="v">{{ analysis.duration_seconds }}s</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin:12px 0">
+  <h3>Scores par composante <span>/ Component Scores</span></h3>
+  {% for item in shap_values %}
+  <div class="comp-row">
+    <span class="comp-label">{{ {'texture':'Texture (EfficientNet)','temporal':'Temporel / Temporal (LSTM)','rppg':'rPPG (CHROM)','biometrics':'Biométrie / Biometrics','audio':'Audio (Wav2Vec2)','phase':'Phase STFT','metadata':'Métadonnées / Metadata'}.get(item.feature, item.feature) }}</span>
+    <div class="comp-bar-out"><div class="comp-bar-in" style="width:{{ (item.raw_score * 100)|round }}%;background:{{ '#B91C1C' if item.raw_score > 0.55 else ('#B45309' if item.raw_score > 0.35 else '#18794E') }}"></div></div>
+    <span class="comp-val" style="color:{{ '#B91C1C' if item.raw_score > 0.55 else ('#B45309' if item.raw_score > 0.35 else '#18794E') }}">{{ "%.0f"|format(item.raw_score * 100) }}%</span>
+  </div>
+  {% endfor %}
+  <div style="display:flex;justify-content:space-between;font-size:9pt;margin-top:10px;padding-top:6px;border-top:1px solid #DDE3F0">
+    <span style="color:#18794E">0% — Authentique / Authentic</span>
+    <strong>SCORE FUSIONNÉ / FUSED SCORE : {{ "%.1f"|format(analysis.final_score * 100) }}%</strong>
+    <span style="color:#B91C1C">100% — Deepfake</span>
+  </div>
+</div>
+
+<div class="bi-block">
+  <div class="bi-fr">
+    <div class="bi-lang">🇫🇷 Explication accessible / Plain-Language Explanation</div>
+    <p style="font-size:10.5pt">{{ analysis.xai_plain_explanation }}</p>
+  </div>
+  <div class="bi-en">
+    <div class="bi-lang">🇨🇦 Plain-Language Explanation / Explication accessible</div>
+    <p style="font-size:10.5pt">{{ analysis.xai_plain_explanation }}</p>
+  </div>
+</div>
+
+<div class="card" style="margin:12px 0">
+  <h3>Intégrité du fichier — Chaîne de possession <span>/ File Integrity — Chain of Custody</span></h3>
+  <table class="info">
+    <tr><td>SHA-256</td><td class="hash-cell">{{ media_file.hash_sha256 }}</td></tr>
+    <tr><td>BLAKE3</td><td class="hash-cell">{{ media_file.hash_blake3 }}</td></tr>
+    <tr><td>Horodatage TSA / TSA Timestamp</td><td>{{ media_file.tsa_timestamp or 'Non disponible / Not available' }}</td></tr>
+  </table>
+</div>
+
+<div class="warn">
+  🇫🇷 Ce résumé est destiné à faciliter la lecture du tribunal. Le rapport complet avec la méthodologie détaillée est disponible sur demande.<br>
+  🇨🇦 This summary is intended to facilitate reading by the court. The full report with detailed methodology is available upon request.
+</div>
+
+<div class="two-col" style="margin-top:10px">
+  <div class="col">
+    <div class="card">
+      <h3>Performance du modèle <span>/ Model Performance</span></h3>
+      <div class="kv"><span class="k">AUC</span><span class="v">{{ analysis.model_auc }}</span></div>
+      <div class="kv"><span class="k">EER</span><span class="v">{{ "%.1f"|format(analysis.model_eer * 100) }}%</span></div>
+      <div class="kv"><span class="k">FAR</span><span class="v">{{ "%.1f"|format(analysis.model_far * 100) }}%</span></div>
+      <div class="kv"><span class="k">FRR</span><span class="v">{{ "%.1f"|format(analysis.model_frr * 100) }}%</span></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <h3>Expert mandaté <span>/ Expert Witness</span></h3>
+      <div class="kv"><span class="k">Nom / Name</span><span class="v">{{ expert_name or expert.username }}</span></div>
+      {% if expert_title %}<div class="kv"><span class="k">Titre / Title</span><span class="v" style="font-size:9pt">{{ expert_title }}</span></div>{% endif %}
+      {% if lab_name %}<div class="kv"><span class="k">Labo / Lab</span><span class="v" style="font-size:9pt">{{ lab_name }}</span></div>{% endif %}
+      <div class="kv"><span class="k">Date</span><span class="v" style="font-size:9pt">{{ generated_at }}</span></div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:28px">
+  <div style="display:flex;gap:40px">
+    <div style="flex:2"><div class="sig-line">Signature de l'expert / Expert Signature</div></div>
+    <div style="flex:1"><div class="sig-line">Date</div></div>
+  </div>
+</div>
+<div class="hash-box" style="margin-top:12px">
+N° rapport / Report No.: {{ report_number }} | SHA-256: {{ report_hash_sha256 }} | Signé / Signed: RSA-4096 ✅
+</div>
+</body>
+</html>

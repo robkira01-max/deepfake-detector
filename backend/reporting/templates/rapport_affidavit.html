@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+<meta charset="UTF-8">
+<title>Affidavit technique / Technical Affidavit -- {{ report_number }}</title>
+<style>
+  @page {
+    size: letter; margin: 2.5cm 2.5cm 3cm 3.5cm;
+    @top-right { content: "N{{ report_number }}"; font-size: 8pt; font-family: monospace; color: #666; }
+    @bottom-center { content: "Page " counter(page) " de / of " counter(pages); font-size: 8pt; color: #666; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.9; color: #000; }
+  .title-block { text-align: center; margin: 0 0 26px; border-bottom: 2px solid #000; padding-bottom: 18px; }
+  .title-block h1 { font-size: 15pt; font-weight: bold; text-transform: uppercase; }
+  .title-block h1 span { display: block; font-size: 13pt; color: #2D4270; text-transform: none; margin-top: 4px; }
+  .title-block .refs { font-size: 9pt; color: #444; margin-top: 6px; font-style: italic; }
+  .court-block { border: 2px solid #000; padding: 12px 16px; margin: 18px 0; }
+  .court-block .label { font-size: 8.5pt; text-transform: uppercase; color: #555; margin-bottom: 5px; }
+  .court-field { display: flex; gap: 8px; margin: 3px 0; font-size: 10.5pt; }
+  .court-field .k { min-width: 200px; font-weight: bold; }
+  .court-field .k span { display: block; font-size: 8.5pt; font-weight: normal; color: #666; font-style: italic; }
+  p.para { text-align: justify; margin: 10px 0; }
+  p.para .num { font-weight: bold; margin-right: 8px; }
+  .bi-block { display: flex; gap: 0; border: 1px solid #CCC; border-radius: 4px; margin: 10px 0; overflow: hidden; page-break-inside: avoid; }
+  .bi-fr { flex: 1; padding: 10px 13px; background: #F8FAFF; border-right: 1px solid #CCC; }
+  .bi-en { flex: 1; padding: 10px 13px; background: #FFFFF8; }
+  .bi-lang { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .08em; font-weight: bold; margin-bottom: 4px; }
+  .bi-fr .bi-lang { color: #003DA5; } .bi-en .bi-lang { color: #C8102E; }
+  .stmt { margin: 12px 0; padding-left: 20px; border-left: 3px solid #1B2A4A; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11pt; page-break-inside: avoid; }
+  th { background: #1B2A4A; color: #fff; padding: 7px 9px; text-align: left; font-size: 10pt; }
+  th span { display: block; font-size: 8.5pt; opacity: .75; font-style: italic; }
+  td { padding: 6px 9px; border-bottom: 1px solid #CCC; }
+  tr:nth-child(even) td { background: #F9F9F9; }
+  .hash-cell { font-family: "Courier New", monospace; font-size: 9pt; word-break: break-all; }
+  .bilabel { display: block; font-size: 8pt; color: #888; font-style: italic; }
+  .jurat { border: 2px solid #000; padding: 18px; margin-top: 26px; page-break-inside: avoid; }
+  .jurat h3 { text-align: center; text-transform: uppercase; font-size: 12pt; letter-spacing: .06em; margin-bottom: 8px; }
+  .jurat h3 span { display: block; font-size: 11pt; font-style: italic; text-transform: none; letter-spacing: 0; color: #2D4270; }
+  .sig-line { border-top: 1.5px solid #000; margin-top: 52px; padding-top: 5px; font-size: 10pt; }
+  .notary-box { border: 1.5px solid #888; padding: 14px; margin-top: 18px; }
+  .notary-box h4 { text-transform: uppercase; font-size: 9.5pt; border-bottom: 1px solid #888; padding-bottom: 4px; margin-bottom: 8px; }
+  .notary-box h4 span { display:block; font-style:italic; text-transform:none; font-size:9pt; color:#555; }
+  .crypto-box { font-family: monospace; font-size: 8.5pt; background: #F5F5F5; border: 1px solid #CCC; padding: 9px 13px; margin: 10px 0; word-break: break-all; line-height: 1.7; }
+  .disclaimer { font-size: 9.5pt; font-style: italic; border-top: 1px solid #CCC; margin-top: 14px; padding-top: 8px; color: #444; }
+  .exhibit-box { border: 2px solid #888; padding: 8px 13px; margin: 8px 0; }
+  .exhibit-box .exh-label { font-size: 8.5pt; text-transform: uppercase; color: #666; }
+  .exhibit-box .exh-val { font-weight: bold; }
+  .note-box { border:1px solid #1B2A4A; padding:10px 14px; margin:12px 0; border-radius:4px; background:#EFF6FF; }
+</style>
+</head>
+<body>
+
+<div class="title-block">
+  <h1>Affidavit technique d'expert<span>Technical Expert Affidavit</span></h1>
+  <div class="refs">
+    Code de proc. civile du Qc (RLRQ c. C-25.01), art. 282-293 / Code of Civil Procedure of Quebec (CQLR c. C-25.01), arts. 282-293<br>
+    Loi sur la preuve au Canada (L.R.C. 1985, ch. C-5) / Canada Evidence Act (R.S.C. 1985, c. C-5)<br>
+    Loi sur les langues officielles (L.R.C. 1985, ch. 31) / Official Languages Act (R.S.C. 1985, c. 31)
+  </div>
+</div>
+
+<div class="court-block">
+  <div class="label">Identification de la procedure / Case Identification</div>
+  <div class="court-field"><span class="k">Tribunal <span>Court</span></span><span>{{ case.jurisdiction | upper }}</span></div>
+  <div class="court-field"><span class="k">N dossier tribunal <span>Court File No.</span></span><span>{{ case.court_reference or "________________" }}</span></div>
+  <div class="court-field"><span class="k">Dossier DeepfakeDetector</span><span>{{ case.case_number }}</span></div>
+  {% if case.plaintiff %}<div class="court-field"><span class="k">Requerant(e) / Plaintiff</span><span>{{ case.plaintiff }}</span></div>{% endif %}
+  {% if case.defendant %}<div class="court-field"><span class="k">Defendeur(e) / Defendant</span><span>{{ case.defendant }}</span></div>{% endif %}
+</div>
+
+<div class="bi-block">
+  <div class="bi-fr">
+    <div class="bi-lang">Declarations preliminaires</div>
+    <p class="para"><span class="num">1.</span>Je, soussigne(e), <strong>{{ expert_name or expert.username }}</strong>{% if expert_title %}, {{ expert_title }}{% endif %}{% if lab_name %}, de {{ lab_name }}{% endif %}, declare ce qui suit sous serment.</p>
+    <p class="para"><span class="num">2.</span>J'ai ete mandate(e) pour proceder a l'analyse forensique numerique d'un fichier multimedia soumis en tant qu'element de preuve dans le cadre de la procedure identifiee ci-dessus.</p>
+  </div>
+  <div class="bi-en">
+    <div class="bi-lang">Preliminary Declarations</div>
+    <p class="para"><span class="num">1.</span>I, the undersigned, <strong>{{ expert_name or expert.username }}</strong>{% if expert_title %}, {{ expert_title }}{% endif %}{% if lab_name %}, of {{ lab_name }}{% endif %}, hereby declare under oath as follows.</p>
+    <p class="para"><span class="num">2.</span>I was retained to conduct a forensic digital analysis of a multimedia file submitted as evidence in the above-identified proceeding.</p>
+  </div>
+</div>
+
+<p class="para"><span class="num">3.</span><strong>Qualifications de l'expert / Expert Qualifications</strong></p>
+<div class="stmt">{% if expert_credentials %}<p>{{ expert_credentials }}</p>{% else %}<div class="bi-block" style="margin:0"><div class="bi-fr"><div class="bi-lang">Francais</div><p>Specialiste en analyse forensique deepfake -- apprentissage profond (EfficientNet-B4, ResNet-50, Wav2Vec2), rPPG computationnel et analyse de phase STFT.</p></div><div class="bi-en"><div class="bi-lang">English</div><p>Specialist in deepfake forensic analysis -- deep learning (EfficientNet-B4, ResNet-50, Wav2Vec2), computational rPPG and STFT phase analysis.</p></div></div>{% endif %}</div>
+
+<p class="para"><span class="num">4.</span><strong>Identification de la piece a conviction / Exhibit Identification</strong></p>
+<div class="exhibit-box"><div class="exh-label">Piece / Exhibit</div><div class="exh-val">{{ media_file.original_filename }}</div></div>
+<table>
+  <tr><th>Attribut <span>Attribute</span></th><th>Valeur / Value</th></tr>
+  <tr><td>Nom original <span class="bilabel">Original filename</span></td><td>{{ media_file.original_filename }}</td></tr>
+  <tr><td>Taille <span class="bilabel">File size</span></td><td>{{ media_file.file_size_bytes | filesizeformat }}</td></tr>
+  <tr><td>Type MIME</td><td>{{ media_file.mime_type }}</td></tr>
+  <tr><td>UUID</td><td class="hash-cell">{{ media_file.uuid }}</td></tr>
+  <tr><td>SHA-256</td><td class="hash-cell">{{ media_file.hash_sha256 }}</td></tr>
+  <tr><td>BLAKE3</td><td class="hash-cell">{{ media_file.hash_blake3 }}</td></tr>
+  <tr><td>MD5</td><td class="hash-cell">{{ media_file.hash_md5 }}</td></tr>
+  <tr><td>Horodatage TSA <span class="bilabel">TSA Timestamp</span></td><td>{{ media_file.tsa_timestamp or "Non disponible / Not available" }}</td></tr>
+</table>
+
+<div class="bi-block">
+  <div class="bi-fr"><div class="bi-lang">Attestation integrite</div><p class="para"><span class="num">5.</span>J'atteste que les empreintes cryptographiques ci-dessus ont ete calculees immediatement a la reception du fichier, et qu'aucune modification n'a ete apportee audit fichier entre sa reception et la presente analyse.</p></div>
+  <div class="bi-en"><div class="bi-lang">Integrity Attestation</div><p class="para"><span class="num">5.</span>I certify that the cryptographic fingerprints above were computed immediately upon receipt of the file, and that no modification was made to the file between its receipt and the present analysis.</p></div>
+</div>
+
+<p class="para"><span class="num">6.</span><strong>Methode d'analyse / Analysis Method</strong></p>
+<table>
+  <tr><th>#</th><th>Composante <span>Component</span></th><th>Algorithme / Model</th><th>Score</th></tr>
+  {% for item in shap_values %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ {"texture":"Texture video / Video texture","temporal":"Coherence temporelle / Temporal","rppg":"rPPG (CHROM)","biometrics":"Biometrie faciale / Facial biometrics","audio":"Analyse vocale / Voice analysis","phase":"Phase STFT","metadata":"Metadonnees / Metadata"}.get(item.feature, item.feature) }}</td>
+    <td style="font-size:10pt">{{ {"texture":"EfficientNet-B4","temporal":"ResNet-50 + LSTM","rppg":"CHROM (Haan & Jeanne 2013)","biometrics":"MediaPipe FaceMesh","audio":"Wav2Vec2-base (Facebook AI)","phase":"scipy.signal.stft","metadata":"FFprobe"}.get(item.feature,"--") }}</td>
+    <td style="text-align:center;font-weight:bold;color:{{ "#B91C1C" if item.raw_score > 0.55 else ("#B45309" if item.raw_score > 0.35 else "#18794E") }}">{{ "%.1f"|format(item.raw_score * 100) }}%</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% set verdict_en = "AUTHENTIC" if analysis.verdict == "AUTHENTIQUE" else ("DEEPFAKE DETECTED" if analysis.verdict == "DEEPFAKE DETECTE" else "INCONCLUSIVE") %}
+<p class="para"><span class="num">7.</span><strong>Resultat de l'analyse / Analysis Result</strong></p>
+<div class="stmt">
+  <p>VERDICT : {{ analysis.verdict }} &nbsp;/&nbsp; FINDING: {{ verdict_en }}</p>
+  <p>Score de risque fustionne / Weighted fused risk score : <strong>{{ "%.1f"|format(analysis.final_score * 100) }}%</strong></p>
+  <p>IC 95% / 95% CI : [{{ "%.1f"|format(analysis.confidence_low * 100) }}%, {{ "%.1f"|format(analysis.confidence_high * 100) }}%]</p>
+  <p>Metriques / Metrics : AUC {{ analysis.model_auc }}, EER {{ "%.1f"|format(analysis.model_eer * 100) }}%, FAR {{ "%.1f"|format(analysis.model_far * 100) }}%, FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%</p>
+</div>
+
+<div class="bi-block">
+  <div class="bi-fr"><div class="bi-lang">Explication accessible</div><p class="para"><span class="num">8.</span>{{ analysis.xai_plain_explanation }}</p></div>
+  <div class="bi-en"><div class="bi-lang">Plain-Language Explanation</div><p class="para"><span class="num">8.</span>{{ analysis.xai_plain_explanation }}</p></div>
+</div>
+
+<div class="bi-block">
+  <div class="bi-fr"><div class="bi-lang">Limitations et reserves</div><p class="para"><span class="num">9.</span>Les modeles utilises reposent sur des poids pre-entrained. Les conclusions representent une evaluation probabiliste. FAR {{ "%.1f"|format(analysis.model_far * 100) }}%. La decision finale quant a la valeur probante appartient au tribunal.</p></div>
+  <div class="bi-en"><div class="bi-lang">Limitations and Reservations</div><p class="para"><span class="num">9.</span>The models use pre-trained weights. The conclusions represent a probabilistic assessment. FAR {{ "%.1f"|format(analysis.model_far * 100) }}%. The final determination of probative value rests with the court.</p></div>
+</div>
+
+{% if notes_for_court %}<div class="note-box"><strong>Note au tribunal / Note to Court :</strong> {{ notes_for_court }}</div>{% endif %}
+
+<div class="jurat">
+  <h3>Serment / Affirmation<span>Oath / Affirmation</span></h3>
+  <div class="bi-block" style="margin-bottom:12px">
+    <div class="bi-fr"><div class="bi-lang">Francais</div><p>Je declare solennellement que les faits exposes dans ce present affidavit sont exacts et complets a ma connaissance. Mon opinion est independante de toute pression des parties.</p></div>
+    <div class="bi-en"><div class="bi-lang">English</div><p>I solemnly declare that the facts set out in this affidavit are true and complete to the best of my knowledge. My opinion is independent of any pressure from any party.</p></div>
+  </div>
+  <div style="display:flex;gap:40px">
+    <div style="flex:2"><div class="sig-line">Signature de l'expert / Expert Signature</div></div>
+    <div style="flex:1"><div class="sig-line">Date : {{ generated_at[:10] }}</div></div>
+  </div>
+  <div style="margin-top:14px">
+    <strong>Nom imprime / Printed Name :</strong> {{ expert_name or expert.username }}<br>
+    {% if expert_title %}<strong>Titre / Title :</strong> {{ expert_title }}<br>{% endif %}
+    {% if lab_name %}<strong>Organisation :</strong> {{ lab_name }}{% endif %}
+  </div>
+  <div class="notary-box" style="margin-top:20px">
+    <h4>Attestation du commissaire a l'assermentation<span>Commissioner for Oaths / Commissaire</span></h4>
+    <div class="bi-block" style="margin:0 0 8px;border:none">
+      <div class="bi-fr" style="background:none;border:none;padding-right:10px"><p>Assermente(e) devant moi a _________________________, province de _________________________, ce _______ jour de _________________________ 20___.</p></div>
+      <div class="bi-en" style="background:none;padding-left:10px"><p>Sworn before me at _________________________, province of _________________________, this _______ day of _________________________ 20___.</p></div>
+    </div>
+    <div class="sig-line" style="margin-top:36px">Signature du commissaire / Commissioner Signature</div>
+    <p style="margin-top:4px">N de commission / Commission No. : _________________________</p>
+  </div>
+</div>
+
+<div class="crypto-box" style="margin-top:16px">
+Affidavit N / No.: {{ report_number }}
+SHA-256: {{ report_hash_sha256 }}
+Signature RSA-4096 PSS-SHA256: Verified
+TSA (RFC 3161): {{ tsa_timestamp }}
+</div>
+<p class="disclaimer">
+  Piece jointe a titre de preuve d'expert -- art. 294 C.p.c. / Exhibit attached as expert evidence -- art. 294 C.C.P.
+</p>
+</body>
+</html>

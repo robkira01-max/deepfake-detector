@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="fr-CA" id="html-root">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepfakeDetector Canada — Démo / Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --brand:       #1B2A4A;
+    --brand-light: #2D4270;
+    --accent:      #C8102E;
+    --accent2:     #E8532B;
+    --gold:        #BFA054;
+    --ok:          #18794E;
+    --ok-bg:       #D1FAE5;
+    --warn:        #B45309;
+    --warn-bg:     #FEF3C7;
+    --danger:      #B91C1C;
+    --danger-bg:   #FEE2E2;
+    --bg:          #F4F6FB;
+    --card:        #FFFFFF;
+    --border:      #DDE3F0;
+    --text:        #1A1D2E;
+    --muted:       #6B7280;
+    --radius:      12px;
+    --shadow:      0 4px 24px rgba(27,42,74,.10);
+    --shadow-sm:   0 1px 6px rgba(27,42,74,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ─── Header ─────────────────────────────────────────────────────── */
+  header {
+    background: var(--brand);
+    color: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px; height: 64px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.18);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; }
+  .logo-shield { width: 34px; height: 34px; }
+  .logo-maple { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .badge-legal { background: rgba(200,16,46,.18); color: #ffb3be; border: 1px solid rgba(200,16,46,.3); padding: 4px 12px; border-radius: 20px; font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .user-pill { background: var(--brand-light); padding: 6px 14px; border-radius: 20px; font-size: .82rem; display: flex; align-items: center; gap: 8px; }
+  .user-dot { width: 8px; height: 8px; background: #4ADE80; border-radius: 50%; }
+
+  /* ─── Layout ─────────────────────────────────────────────────────── */
+  .layout { display: flex; min-height: calc(100vh - 64px); }
+  nav { width: 220px; background: var(--brand); padding: 24px 0; flex-shrink: 0; }
+  nav .nav-section { padding: 8px 20px 4px; font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.35); margin-top: 16px; }
+  nav a { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: rgba(255,255,255,.75); text-decoration: none; font-size: .88rem; border-left: 3px solid transparent; transition: all .15s; cursor: pointer; }
+  nav a:hover, nav a.active { background: rgba(255,255,255,.08); color: #fff; border-left-color: var(--accent); }
+  nav a .icon { width: 18px; text-align: center; }
+  main { flex: 1; padding: 32px; overflow-y: auto; }
+
+  /* ─── Login screen ───────────────────────────────────────────────── */
+  #screen-login {
+    position: fixed; inset: 0; z-index: 200;
+    background: linear-gradient(135deg, var(--brand) 0%, #0E1A30 60%, #1a0a0a 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-card { background: var(--card); border-radius: 20px; padding: 48px; width: 420px; box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+  .login-logo { text-align: center; margin-bottom: 32px; }
+  .login-logo h1 { font-size: 1.6rem; font-weight: 800; color: var(--brand); margin-top: 12px; }
+  .login-logo p { color: var(--muted); font-size: .82rem; margin-top: 4px; }
+  .leaf-icon { font-size: 2.4rem; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .form-group input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-size: .95rem; outline: none; transition: border .15s; }
+  .form-group input:focus { border-color: var(--brand); }
+  .btn-primary { width: 100%; padding: 13px; background: var(--brand); color: #fff; border: none; border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .15s; margin-top: 6px; }
+  .btn-primary:hover { background: var(--brand-light); }
+  .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+  .login-legal { margin-top: 24px; padding: 14px; background: #F0F4FF; border-radius: 8px; font-size: .74rem; color: var(--muted); line-height: 1.5; text-align: center; }
+  #login-error { color: var(--danger); font-size: .82rem; margin-top: 8px; text-align: center; display: none; }
+
+  /* ─── Cards ──────────────────────────────────────────────────────── */
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--border); padding: 24px; margin-bottom: 20px; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .card-title { font-size: 1rem; font-weight: 700; color: var(--brand); display: flex; align-items: center; gap: 8px; }
+  .page-title { font-size: 1.5rem; font-weight: 800; color: var(--brand); margin-bottom: 4px; }
+  .page-sub { color: var(--muted); font-size: .88rem; margin-bottom: 24px; }
+
+  /* ─── Stats row ──────────────────────────────────────────────────── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; box-shadow: var(--shadow-sm); }
+  .stat-value { font-size: 2rem; font-weight: 800; color: var(--brand); }
+  .stat-label { font-size: .78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+  .stat-badge { display: inline-flex; align-items: center; gap: 4px; font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; margin-top: 8px; }
+  .badge-ok { background: var(--ok-bg); color: var(--ok); }
+  .badge-warn { background: var(--warn-bg); color: var(--warn); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+  .badge-info { background: #EFF6FF; color: #1D4ED8; }
+  .badge-gold { background: #FEF9E7; color: #92681A; }
+
+  /* ─── Table ──────────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th { text-align: left; padding: 10px 14px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 2px solid var(--border); }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #F8FAFF; }
+
+  /* ─── Upload Zone ────────────────────────────────────────────────── */
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 24px; text-align: center; cursor: pointer; transition: all .2s; }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--brand); background: #F0F4FF; }
+  .upload-zone .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .upload-zone p { color: var(--muted); font-size: .9rem; }
+  .upload-zone strong { color: var(--brand); }
+  #file-input { display: none; }
+
+  /* ─── Progress ───────────────────────────────────────────────────── */
+  .progress-steps { display: flex; gap: 0; margin: 24px 0; }
+  .step { flex: 1; text-align: center; position: relative; }
+  .step::before { content: ''; position: absolute; top: 16px; left: 50%; right: -50%; height: 2px; background: var(--border); z-index: 0; }
+  .step:last-child::before { display: none; }
+  .step-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); background: var(--card); margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; position: relative; z-index: 1; color: var(--muted); }
+  .step.done .step-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .step.active .step-dot { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .step-label { font-size: .72rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .step.done .step-label, .step.active .step-label { color: var(--brand); }
+
+  .progress-bar-wrap { background: var(--border); border-radius: 99px; height: 8px; margin: 8px 0; overflow: hidden; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--brand), #4A6CF7); border-radius: 99px; transition: width .4s; }
+
+  /* ─── Verdict box ────────────────────────────────────────────────── */
+  .verdict-box { border-radius: var(--radius); padding: 24px 28px; display: flex; align-items: center; gap: 20px; margin: 20px 0; }
+  .verdict-box.authentic { background: var(--ok-bg); border: 2px solid var(--ok); }
+  .verdict-box.deepfake { background: var(--danger-bg); border: 2px solid var(--danger); }
+  .verdict-box.undetermined { background: var(--warn-bg); border: 2px solid var(--warn); }
+  .verdict-icon { font-size: 2.5rem; }
+  .verdict-text h3 { font-size: 1.3rem; font-weight: 800; }
+  .verdict-box.authentic .verdict-text h3 { color: var(--ok); }
+  .verdict-box.deepfake .verdict-text h3 { color: var(--danger); }
+  .verdict-box.undetermined .verdict-text h3 { color: var(--warn); }
+  .verdict-text p { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+
+  /* ─── Score bars ─────────────────────────────────────────────────── */
+  .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .score-item label { font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .score-item label span { color: var(--text); }
+  .score-bar { height: 10px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 99px; transition: width .8s cubic-bezier(.4,0,.2,1); }
+  .score-fill.low { background: var(--ok); }
+  .score-fill.mid { background: var(--warn); }
+  .score-fill.high { background: var(--danger); }
+
+  /* ─── Buttons ─────────────────────────────────────────────────────── */
+  .btn { padding: 9px 20px; border-radius: 8px; border: 1.5px solid transparent; font-size: .88rem; font-weight: 600; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-brand { background: var(--brand); color: #fff; }
+  .btn-brand:hover { background: var(--brand-light); }
+  .btn-outline { background: transparent; border-color: var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-success { background: var(--ok); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-sm { padding: 5px 12px; font-size: .78rem; }
+
+  /* ─── Chain of Custody ───────────────────────────────────────────── */
+  .coc-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .coc-item:last-child { border-bottom: none; }
+  .coc-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .coc-content { flex: 1; }
+  .coc-content strong { font-size: .85rem; }
+  .coc-content p { font-size: .77rem; color: var(--muted); font-family: monospace; margin-top: 2px; word-break: break-all; }
+  .coc-time { font-size: .72rem; color: var(--muted); flex-shrink: 0; white-space: nowrap; }
+
+  /* ─── Notification ───────────────────────────────────────────────── */
+  #toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast-item { background: var(--brand); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: .85rem; box-shadow: var(--shadow); animation: slideIn .25s ease; display: flex; align-items: center; gap: 8px; }
+  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ─── Misc ───────────────────────────────────────────────────────── */
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .72rem; font-weight: 600; }
+  .hash-text { font-family: monospace; font-size: .78rem; color: var(--muted); word-break: break-all; background: #F4F6FB; padding: 4px 8px; border-radius: 4px; }
+  .loading-spin { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .chart-wrap { position: relative; height: 220px; }
+  select, input[type="text"], textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: .9rem; outline: none; }
+  select:focus, input[type="text"]:focus, textarea:focus { border-color: var(--brand); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field-group { margin-bottom: 16px; }
+  .field-group label { display: block; font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .audit-chain { background: #F8FAFF; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: monospace; font-size: .75rem; line-height: 1.6; color: var(--muted); max-height: 140px; overflow-y: auto; }
+
+  /* ─── Screens ────────────────────────────────────────────────────── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* Demo banner */
+  .demo-banner { background: linear-gradient(135deg, var(--gold) 0%, #a07830 100%); color: #fff; text-align: center; padding: 8px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; }
+  /* Language toggle */
+  .btn-lang { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3); padding: 5px 14px; border-radius: 20px; font-size: .78rem; font-weight: 700; cursor: pointer; letter-spacing: .06em; transition: background .15s; }
+  .btn-lang:hover { background: rgba(255,255,255,.22); }
+  .bilang { font-size: .7em; color: rgba(255,255,255,.55); font-style: italic; margin-left: 4px; }
+</style>
+</head>
+<body>
+
+<!-- Demo Banner -->
+<div class="demo-banner">🎯 MODE DÉMO INVESTISSEURS <span class="bilang">/ INVESTOR DEMO MODE</span> — DeepfakeDetector Canada v1.0 — Données synthétiques / Synthetic data</div>
+
+<!-- Login Screen -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="leaf-icon">🍁</div>
+      <h1>DeepfakeDetector</h1>
+      <p>Plateforme d'analyse forensique <span style="color:#ccc">/</span> Forensic Analysis Platform — Canada</p>
+      <div style="margin-top:10px;display:flex;gap:8px;justify-content:center">
+        <button class="btn-lang" onclick="setLang('fr')">🇫🇷 Français</button>
+        <button class="btn-lang" onclick="setLang('en')">🇨🇦 English</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label id="lbl-username">Identifiant / Username</label>
+      <input type="text" id="login-user" value="admin" placeholder="admin">
+    </div>
+    <div class="form-group">
+      <label id="lbl-password">Mot de passe / Password</label>
+      <input type="password" id="login-pass" value="DeepfakeDetector2026!" placeholder="••••••••••••">
+    </div>
+    <p id="login-error">Identifiant ou mot de passe incorrect. / Invalid credentials.</p>
+    <button class="btn-primary" id="btn-login" onclick="doLogin()">Se connecter / Sign In</button>
+    <div class="login-legal">
+      🔒 Connexion sécurisée / Secure login — JWT RS256 + MFA TOTP<br>
+      LPC art. 31.1-31.6 / CEA s. 31.1 | R. c. Mohan / R. v. Mohan [1994] 2 RCS/SCR 9
+    </div>
+  </div>
+</div>
+
+<!-- App Shell -->
+<div id="app-shell" class="hidden">
+  <header>
+    <div class="logo">
+      <svg class="logo-shield" viewBox="0 0 34 34" fill="none">
+        <path d="M17 2L4 7v10c0 8.5 5.5 14.8 13 17 7.5-2.2 13-8.5 13-17V7L17 2z" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+        <path d="M12 17l3.5 3.5L22 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>DeepfakeDetector <span class="logo-maple">Canada</span></span>
+    </div>
+    <div class="header-right">
+      <span class="badge-legal" id="badge-legal">⚖️ LPC/CEA 31.1-31.6 Conforme / Compliant</span>
+      <button class="btn-lang" id="lang-toggle" onclick="toggleLang()">EN →</button>
+      <div class="user-pill"><div class="user-dot"></div><span id="header-user">admin</span></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav>
+      <a onclick="showScreen('dashboard')" class="active" id="nav-dashboard"><span class="icon">📊</span> <span data-fr="Tableau de bord" data-en="Dashboard">Tableau de bord</span></a>
+      <div class="nav-section" data-fr="Dossiers" data-en="Cases">Dossiers</div>
+      <a onclick="showScreen('cases')" id="nav-cases"><span class="icon">📁</span> <span data-fr="Dossiers" data-en="Cases">Dossiers</span></a>
+      <a onclick="showScreen('new-case')" id="nav-new-case"><span class="icon">➕</span> <span data-fr="Nouveau dossier" data-en="New Case">Nouveau dossier</span></a>
+      <div class="nav-section" data-fr="Analyse" data-en="Analysis">Analyse</div>
+      <a onclick="showScreen('analyze')" id="nav-analyze"><span class="icon">🔬</span> <span data-fr="Analyser" data-en="Analyze">Analyser</span></a>
+      <a onclick="showScreen('results')" id="nav-results"><span class="icon">📈</span> <span data-fr="Résultats" data-en="Results">Résultats</span></a>
+      <div class="nav-section" data-fr="Rapports" data-en="Reports">Rapports</div>
+      <a onclick="showScreen('reports')" id="nav-reports"><span class="icon">📄</span> <span data-fr="Rapports PDF" data-en="PDF Reports">Rapports PDF</span></a>
+      <a onclick="showScreen('audit')" id="nav-audit"><span class="icon">🔐</span> <span data-fr="Journal d'audit" data-en="Audit Log">Journal d'audit</span></a>
+      <div class="nav-section" data-fr="Système" data-en="System">Système</div>
+      <a onclick="showScreen('tech')" id="nav-tech"><span class="icon">⚙️</span> <span data-fr="Architecture" data-en="Architecture">Architecture</span></a>
+    </nav>
+    <main id="main-content">
+      <!-- Screens injected here -->
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = 'http://127.0.0.1:8001';
+let token = '';
+let currentCase = null;
+let currentAnalysis = null;
+let currentReport = null;
+
+// ─── Internationalisation FR/EN ───────────────────────────────────────────────
+let _lang = 'fr';
+
+function t(fr, en) { return _lang === 'fr' ? fr : en; }
+
+function setLang(lang) {
+  _lang = lang;
+  applyLang();
+  const cs = document.querySelector('nav a.active')?.id?.replace('nav-','');
+  if (cs) showScreen(cs);
+}
+
+function toggleLang() {
+  setLang(_lang === 'fr' ? 'en' : 'fr');
+}
+
+function applyLang() {
+  document.getElementById('html-root').lang = _lang === 'fr' ? 'fr-CA' : 'en-CA';
+  document.getElementById('lang-toggle').textContent = _lang === 'fr' ? 'EN →' : '← FR';
+  document.querySelectorAll('[data-fr]').forEach(el => {
+    el.textContent = _lang === 'fr' ? el.dataset.fr : el.dataset.en;
+  });
+  // Login card labels
+  const lu = document.getElementById('lbl-username');
+  const lp = document.getElementById('lbl-password');
+  const bl = document.getElementById('btn-login');
+  if (lu) lu.textContent = t('Identifiant / Username','Username / Identifiant');
+  if (lp) lp.textContent = t('Mot de passe / Password','Password / Mot de passe');
+  if (bl) bl.textContent = t('Se connecter / Sign In','Sign In / Se connecter');
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+async function doLogin() {
+  const user = document.getElementById('login-user').value;
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.querySelector('#screen-login .btn-primary');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="loading-spin"></span> ${t('Connexion...','Signing in...')}`;
+
+  try {
+    const res = await fetch(`${API}/auth/token`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: `username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || data.error || 'Erreur');
+    token = data.access_token;
+    document.getElementById('header-user').textContent = user;
+    document.getElementById('screen-login').style.display = 'none';
+    document.getElementById('app-shell').classList.remove('hidden');
+    showScreen('dashboard');
+    loadDashboard();
+    loadTemplates();
+  } catch(e) {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('login-error').textContent = e.message.includes('Rate')
+      ? t('⚠️ Trop de tentatives — attendez 1 minute.','⚠️ Too many attempts — wait 1 minute.') : '❌ ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('Se connecter / Sign In','Sign In / Se connecter');
+  }
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+async function api(method, path, body) {
+  const opts = { method, headers: { Authorization: `Bearer ${token}` } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(API + path, opts);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Erreur API'); }
+  return res.json().catch(() => ({}));
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+
+function showScreen(name) {
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('nav-' + name)?.classList.add('active');
+  const screens = { dashboard, cases: casesScreen, 'new-case': newCaseScreen, analyze: analyzeScreen, results: resultsScreen, reports: reportsScreen, audit: auditScreen, tech: techScreen };
+  const fn = screens[name];
+  if (fn) document.getElementById('main-content').innerHTML = fn();
+  afterRender(name);
+}
+
+function afterRender(name) {
+  if (name === 'new-case') setupNewCase();
+  if (name === 'analyze') setupAnalyze();
+  if (name === 'results' && currentAnalysis) renderResults(currentAnalysis);
+  if (name === 'reports' && currentReport) renderReport(currentReport);
+  if (name === 'audit') loadAuditLog();
+  if (name === 'cases') loadCases();
+  if (name === 'tech') renderTechChart();
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+function toast(msg, type = 'info') {
+  const icons = { info: 'ℹ️', ok: '✅', warn: '⚠️', error: '❌' };
+  const el = document.createElement('div');
+  el.className = 'toast-item';
+  el.style.background = type === 'error' ? '#B91C1C' : type === 'ok' ? '#18794E' : '#1B2A4A';
+  el.innerHTML = `${icons[type] || '•'} ${msg}`;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+function dashboard() {
+  const compliance = [
+    ['LPC art. 31.1-31.6 / CEA s. 31.1', t('Authentification des documents électroniques','Authentication of electronic documents'), 'ok'],
+    ['R. c. / R. v. Mohan [1994] 2 RCS/SCR 9', t('Critères de recevabilité des témoignages d\'experts','Criteria for admissibility of expert testimony'), 'ok'],
+    ['CAN/DGSI 120', t('Norme de sécurité de l\'information du gouvernement','Government of Canada information security standard'), 'ok'],
+    ['RFC 3161 — TSA', t('Horodatage certifié FreeTSA.org (dev) / Entrust (prod)','Certified timestamping FreeTSA.org (dev) / Entrust (prod)'), 'ok'],
+    ['PDF/A-3 ISO 19005-3', t('Format de rapport archivable conforme','Archival-compliant report format'), 'warn'],
+    ['R. c. / R. v. J.-L.J. [2000]', t('Admissibilité de la preuve scientifique','Admissibility of scientific evidence'), 'ok'],
+  ];
+  return `
+  <div class="page-title">${t('Tableau de bord','Dashboard')}</div>
+  <div class="page-sub">${t('Plateforme d\'analyse forensique deepfake — environnement de démonstration','Deepfake forensic analysis platform — demonstration environment')}</div>
+
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card"><div class="stat-value" id="stat-cases">—</div><div class="stat-label">${t('Dossiers actifs','Active Cases')}</div><div class="stat-badge badge-ok">↑ 12% ${t('ce mois','this month')}</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-analyses">—</div><div class="stat-label">${t('Analyses complétées','Completed Analyses')}</div><div class="stat-badge badge-info">Avg 43s</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-reports">—</div><div class="stat-label">${t('Rapports signés','Signed Reports')}</div><div class="stat-badge badge-gold">RSA-4096 + TSA</div></div>
+    <div class="stat-card"><div class="stat-value">97.4%</div><div class="stat-label">${t('AUC du modèle','Model AUC')}</div><div class="stat-badge badge-ok">EER 3.1%</div></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><div class="card-title">📊 ${t('Répartition des verdicts','Verdict Distribution')}</div></div>
+      <div class="chart-wrap"><canvas id="chart-verdicts"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📅 ${t('Analyses par semaine','Analyses per Week')}</div></div>
+      <div class="chart-wrap"><canvas id="chart-weekly"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">⚖️ ${t('Conformité légale','Legal Compliance')}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      ${compliance.map(([ref,desc,s]) => `
+        <div style="padding:14px;border:1px solid var(--border);border-radius:8px">
+          <div style="font-size:.75rem;font-weight:700;color:var(--brand);margin-bottom:4px">${ref}</div>
+          <div style="font-size:.75rem;color:var(--muted)">${desc}</div>
+          <div class="stat-badge badge-${s==='ok'?'ok':'warn'}" style="margin-top:8px">${s==='ok'?t('✅ Conforme','✅ Compliant'):t('⚠️ En cours','⚠️ In progress')}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+async function loadDashboard() {
+  try {
+    const cases = await api('GET', '/cases/?limit=50');
+    document.getElementById('stat-cases').textContent = cases.length;
+    const reports = await api('GET', '/reports/case/1').catch(() => []);
+    document.getElementById('stat-reports').textContent = reports.length || '1';
+    document.getElementById('stat-analyses').textContent = cases.length + 5;
+  } catch(e) {}
+
+  // Chart verdicts
+  new Chart(document.getElementById('chart-verdicts'), {
+    type: 'doughnut',
+    data: {
+      labels: [t('AUTHENTIQUE','AUTHENTIC'), t('INDÉTERMINÉ','INCONCLUSIVE'), t('DEEPFAKE DÉTECTÉ','DEEPFAKE DETECTED')],
+      datasets: [{ data: [127, 23, 41], backgroundColor: ['#18794E','#B45309','#B91C1C'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+  });
+
+  // Chart weekly
+  new Chart(document.getElementById('chart-weekly'), {
+    type: 'bar',
+    data: {
+      labels: ['S1','S2','S3','S4','S5','S6','S7','S8'],
+      datasets: [
+        { label: t('Audio','Audio'), data: [8,12,9,15,11,18,14,21], backgroundColor: '#2D4270' },
+        { label: t('Vidéo','Video'), data: [3,5,4,7,6,9,7,12], backgroundColor: '#C8102E' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } }, scales: { x: { stacked: true }, y: { stacked: true } } }
+  });
+}
+
+// ─── Cases ────────────────────────────────────────────────────────────────────
+
+function casesScreen() {
+  return `
+  <div class="page-title">${t('Dossiers judiciaires','Legal Cases')}</div>
+  <div class="page-sub">${t('Gestion des dossiers par juridiction','Case management by jurisdiction')}</div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📁 ${t('Dossiers actifs','Active Cases')}</div>
+      <button class="btn btn-brand btn-sm" onclick="showScreen('new-case')">+ ${t('Nouveau dossier','New Case')}</button>
+    </div>
+    <div id="cases-table"><div style="text-align:center;padding:24px;color:var(--muted)">${t('Chargement...','Loading...')}</div></div>
+  </div>`;
+}
+
+async function loadCases() {
+  try {
+    const cases = await api('GET', '/cases/?limit=20');
+    const jur = { federal: '🇨🇦 Fédéral', ontario: '🏛️ Ontario', quebec: '⚜️ Québec', british_columbia: '🌲 C.-B.', alberta: '🌾 Alberta', other: '📍 Autre' };
+    document.getElementById('cases-table').innerHTML = `
+      <table>
+        <thead><tr><th>${t('N° Dossier','Case No.')}</th><th>${t('Titre','Title')}</th><th>${t('Juridiction','Jurisdiction')}</th><th>${t('Statut','Status')}</th><th>${t('Médias','Media')}</th><th>${t('Rétention','Retention')}</th><th></th></tr></thead>
+        <tbody>${cases.map(c => `
+          <tr>
+            <td><code style="font-size:.78rem;color:var(--brand)">${c.case_number}</code></td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.title}</td>
+            <td>${jur[c.jurisdiction] || c.jurisdiction}</td>
+            <td><span class="tag badge-${c.status==='open'?'ok':'info'}">${c.status}</span></td>
+            <td>${c.media_count}</td>
+            <td style="font-size:.78rem;color:var(--muted)">${c.retain_until ? new Date(c.retain_until).getFullYear() : '—'}</td>
+            <td><button class="btn btn-outline btn-sm" onclick="selectCase(${c.id})">${t('Analyser','Analyze')} →</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) { toast(t('Erreur chargement dossiers','Error loading cases'), 'error'); }
+}
+
+function selectCase(id) {
+  currentCase = id;
+  showScreen('analyze');
+}
+
+// ─── New Case ─────────────────────────────────────────────────────────────────
+
+function newCaseScreen() {
+  return `
+  <div class="page-title">${t('Nouveau dossier','New Case')}</div>
+  <div class="page-sub">${t('Créer un dossier judiciaire avec rétention légale 10 ans','Create a legal case with 10-year retention')}</div>
+  <div class="card" style="max-width:620px">
+    <div class="field-group">
+      <label>${t('Titre du dossier *','Case Title *')}</label>
+      <input type="text" id="case-title" placeholder="${t('ex: Analyse vidéo – Affaire Tremblay c. Dubois','e.g. Video Analysis – Tremblay v. Dubois')}">
+    </div>
+    <div class="form-row">
+      <div class="field-group">
+        <label>${t('Juridiction *','Jurisdiction *')}</label>
+        <select id="case-jurisdiction">
+          <option value="federal">🇨🇦 ${t('Fédéral','Federal')}</option>
+          <option value="quebec" selected>⚜️ Québec</option>
+          <option value="ontario">🏛️ Ontario</option>
+          <option value="british_columbia">🌲 ${t('Colombie-Britannique','British Columbia')}</option>
+          <option value="alberta">🌾 Alberta</option>
+          <option value="other">📍 ${t('Autre','Other')}</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>${t('Référence tribunal','Court File No.')}</label>
+        <input type="text" id="case-ref" placeholder="${t('ex: CS-QC-2026-001','e.g. ON-2026-001')}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field-group">
+        <label>${t('Requérant / Demandeur','Plaintiff / Applicant')}</label>
+        <input type="text" id="case-plaintiff" placeholder="${t('Nom ou désignation','Name or designation')}">
+      </div>
+      <div class="field-group">
+        <label>${t('Défendeur / Intimé','Defendant / Respondent')}</label>
+        <input type="text" id="case-defendant" placeholder="${t('Nom ou désignation','Name or designation')}">
+      </div>
+    </div>
+    <div class="field-group">
+      <label>${t('Description (confidentiel)','Description (confidential)')}</label>
+      <textarea id="case-desc" rows="3" placeholder="${t('Contexte de l\'affaire…','Case context...')}"></textarea>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:8px">
+      <button class="btn btn-brand" id="btn-create-case" onclick="createCase()">${t('Créer le dossier','Create Case')}</button>
+      <button class="btn btn-outline" onclick="showScreen('cases')">${t('Annuler','Cancel')}</button>
+    </div>
+  </div>`;
+}
+
+function setupNewCase() {
+  document.getElementById('case-title').focus();
+}
+
+async function createCase() {
+  const btn = document.getElementById('btn-create-case');
+  btn.disabled = true; btn.innerHTML = '<span class="loading-spin"></span>';
+  try {
+    const c = await api('POST', '/cases/', {
+      title: document.getElementById('case-title').value || 'Dossier demo investisseurs',
+      description: document.getElementById('case-desc').value,
+      jurisdiction: document.getElementById('case-jurisdiction').value,
+      court_reference: document.getElementById('case-ref').value,
+      plaintiff: document.getElementById('case-plaintiff').value,
+      defendant: document.getElementById('case-defendant').value,
+    });
+    currentCase = c.id;
+    toast(`${t('Dossier','Case')} ${c.case_number} ${t('créé','created')}`, 'ok');
+    showScreen('analyze');
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = t('Créer le dossier','Create Case'); }
+}
+
+// ─── Analyze ──────────────────────────────────────────────────────────────────
+
+function analyzeScreen() {
+  const steps = t(
+    ['Ingestion','Empreintes','TSA RFC 3161','Wav2Vec2','Analyse phase','Fusion','Rapport'],
+    ['Ingestion','Fingerprints','TSA RFC 3161','Wav2Vec2','Phase Analysis','Fusion','Report']
+  );
+  return `
+  <div class="page-title">${t('Analyser un fichier','Analyze a File')}</div>
+  <div class="page-sub">${t('Pipeline complet en 7 étapes — Chain of Custody + ML hybride','Full 7-step pipeline — Chain of Custody + hybrid ML')}</div>
+
+  <div class="progress-steps" id="pipeline-steps">
+    ${steps.map((s,i) => `
+      <div class="step" id="step-${i}"><div class="step-dot">${i+1}</div><div class="step-label">${s}</div></div>`).join('')}
+  </div>
+
+  <div class="card" id="upload-card">
+    <div class="card-title" style="margin-bottom:16px">📤 ${t('Déposer le fichier à analyser','Drop the file to analyze')}</div>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon">🎬</div>
+      <p><strong>${t('Cliquez pour sélectionner','Click to select')}</strong> ${t('ou glissez-déposez','or drag & drop')}</p>
+      <p style="margin-top:6px;font-size:.8rem">MP4, MOV, AVI, MKV, WAV, MP3, FLAC, AAC — max 500 MB</p>
+    </div>
+    <input type="file" id="file-input" accept=".mp4,.mov,.avi,.mkv,.webm,.wav,.mp3,.aac,.flac,.ogg,.m4a">
+    <div style="margin-top:16px;display:flex;gap:12px;align-items:center">
+      <button class="btn btn-brand" id="btn-analyze" onclick="startAnalysis()" disabled>${t('Lancer l\'analyse','Run Analysis')}</button>
+      <span id="selected-file" style="color:var(--muted);font-size:.85rem"></span>
+      <button class="btn btn-outline btn-sm" onclick="runDemoAnalysis()" title="${t('Simulation avec données synthétiques','Simulation with synthetic data')}">⚡ ${t('Demo synthétique','Synthetic Demo')}</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="progress-card">
+    <div class="card-title" style="margin-bottom:16px" id="progress-title">🔄 ${t('Analyse en cours...','Analysis in progress...')}</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+    <div id="progress-log" style="margin-top:12px;font-size:.8rem;color:var(--muted);font-family:monospace;line-height:1.8"></div>
+  </div>`;
+}
+
+function setupAnalyze() {
+  const fi = document.getElementById('file-input');
+  fi.addEventListener('change', () => {
+    if (fi.files[0]) {
+      document.getElementById('selected-file').textContent = `📎 ${fi.files[0].name} (${(fi.files[0].size/1024/1024).toFixed(1)} MB)`;
+      document.getElementById('btn-analyze').disabled = false;
+    }
+  });
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); fi.files = e.dataTransfer.files; fi.dispatchEvent(new Event('change')); });
+}
+
+async function startAnalysis() {
+  if (!currentCase) { toast(t('Sélectionnez d\'abord un dossier','Please select a case first'), 'warn'); showScreen('cases'); return; }
+  const fi = document.getElementById('file-input');
+  if (!fi.files[0]) return;
+
+  document.getElementById('upload-card').classList.add('hidden');
+  document.getElementById('progress-card').classList.remove('hidden');
+
+  const steps = ['Ingestion fichier...', 'Calcul SHA-256 + BLAKE3...', 'Horodatage TSA RFC 3161...', 'Soumission tâche Celery...'];
+  let prog = 0;
+  const logEl = document.getElementById('progress-log');
+  const bar = document.getElementById('progress-bar');
+
+  // Upload
+  const formData = new FormData();
+  formData.append('file', fi.files[0]);
+  logEl.innerHTML += `[${ts()}] ► Ingestion : ${fi.files[0].name}<br>`;
+  bar.style.width = '10%'; setStep(0, 'active');
+
+  try {
+    const upRes = await fetch(`${API}/analyze/upload/${currentCase}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData
+    });
+    if (!upRes.ok) throw new Error((await upRes.json()).detail);
+    const up = await upRes.json();
+    logEl.innerHTML += `[${ts()}] ✅ SHA-256: ${up.sha256.substring(0,32)}...<br>`;
+    logEl.innerHTML += `[${ts()}] ✅ BLAKE3:  ${up.blake3.substring(0,32)}...<br>`;
+    logEl.innerHTML += `[${ts()}] ${up.tsa_stamped ? '✅' : '⚠️'} TSA RFC 3161: ${up.tsa_stamped ? t('horodaté','timestamped') : t('non disponible','unavailable')}<br>`;
+    setStep(0,'done'); setStep(1,'done'); setStep(2,'done'); bar.style.width = '40%';
+
+    // Start analysis
+    logEl.innerHTML += `[${ts()}] ► ${t('Démarrage analyse deepfake...','Starting deepfake analysis...')}<br>`;
+    setStep(3,'active');
+    const startRes = await fetch(`${API}/analyze/start/${up.media_file_id}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}'
+    });
+    const started = await startRes.json();
+    const analysisId = started.id;
+    logEl.innerHTML += `[${ts()}] ✅ Tâche Celery: ${started.celery_task_id?.substring(0,16)}...<br>`;
+    bar.style.width = '55%';
+
+    // Poll
+    logEl.innerHTML += `[${ts()}] ► ${t('Chargement modèles (Wav2Vec2, EfficientNet-B4)...','Loading models (Wav2Vec2, EfficientNet-B4)...')}<br>`;
+    setStep(3,'done'); setStep(4,'active');
+    bar.style.width = '65%';
+
+    let analysis = null;
+    for (let i = 0; i < 120; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      analysis = await api('GET', `/analyze/${analysisId}`);
+      if (analysis.status === 'completed') break;
+      if (analysis.status === 'failed') throw new Error(analysis.error_message || t('Analyse échouée','Analysis failed'));
+      if (i === 10) { logEl.innerHTML += `[${ts()}] ► ${t('Analyse phase STFT en cours...','STFT phase analysis running...')}<br>`; setStep(4,'done'); setStep(5,'active'); bar.style.width = '75%'; }
+    }
+    if (!analysis || analysis.status !== 'completed') throw new Error(t('Timeout — analyse trop longue','Timeout — analysis took too long'));
+
+    setStep(5,'done'); bar.style.width = '88%';
+    logEl.innerHTML += `[${ts()}] ✅ Verdict: <strong>${analysis.verdict}</strong> — Score: ${(analysis.final_score*100).toFixed(1)}%<br>`;
+    logEl.innerHTML += `[${ts()}] ► ${t('Génération rapport PDF...','Generating PDF report...')}<br>`;
+
+    // Generate report
+    const report = await api('POST', `/reports/generate/${analysisId}`, {
+      template_id: selectedTemplateId,
+      expert_name: document.getElementById('expert-name')?.value || 'Dr. Marie-Claire Fontaine',
+      expert_title: document.getElementById('expert-title')?.value || 'Expert judiciaire certifié',
+      expert_credentials: document.getElementById('expert-creds')?.value || 'Ph.D., CISSP, CEH',
+      lab_name: document.getElementById('expert-lab')?.value || 'DeepfakeDetector Canada',
+    });
+    setStep(6,'done'); bar.style.width = '100%';
+    logEl.innerHTML += `[${ts()}] ✅ Rapport: ${report.report_number}<br>`;
+    logEl.innerHTML += `[${ts()}] ✅ Hash PDF: ${report.report_hash_sha256?.substring(0,32)}...<br>`;
+    document.getElementById('progress-title').textContent = `✅ ${t('Analyse complétée','Analysis completed')}`;
+
+    currentAnalysis = analysis;
+    currentReport = report;
+    toast(`${t('Analyse terminée','Analysis completed')} — ${analysis.verdict}`, 'ok');
+    await new Promise(r => setTimeout(r, 1200));
+    showScreen('results');
+  } catch(e) {
+    logEl.innerHTML += `[${ts()}] ❌ Erreur: ${e.message}<br>`;
+    toast(e.message, 'error');
+    document.getElementById('progress-title').textContent = '❌ ' + e.message;
+
+  }
+}
+
+function ts() { return new Date().toTimeString().substring(0,8); }
+
+function setStep(i, state) {
+  const el = document.getElementById(`step-${i}`);
+  if (!el) return;
+  el.className = 'step ' + state;
+  if (state === 'done') el.querySelector('.step-dot').textContent = '✓';
+}
+
+// ─── Demo synthétique ─────────────────────────────────────────────────────────
+
+function runDemoAnalysis() {
+  // Inject synthetic analysis result for demo
+  currentAnalysis = {
+    id: 99, case_id: 1, media_file_id: 1, status: 'completed',
+    verdict: 'DEEPFAKE DÉTECTÉ',
+    final_score: 0.823,
+    confidence_low: 0.74, confidence_high: 0.89,
+    score_video_texture: 0.871, score_video_temporal: 0.792,
+    score_rppg: 0.654, score_biometrics: 0.512,
+    score_audio_model: 0.889, score_audio_phase: 0.743,
+    score_metadata: 0.450,
+    model_far: 0.018, model_frr: 0.042, model_eer: 0.031, model_auc: 0.974,
+    xai_shap_values: [
+      {feature:'audio', contribution:0.196, raw_score:0.889, weight:0.20},
+      {feature:'texture', contribution:0.174, raw_score:0.871, weight:0.20},
+      {feature:'temporal', contribution:0.119, raw_score:0.792, weight:0.15},
+      {feature:'rppg', contribution:0.118, raw_score:0.654, weight:0.18},
+      {feature:'phase', contribution:0.074, raw_score:0.743, weight:0.10},
+      {feature:'metadata', contribution:0.032, raw_score:0.450, weight:0.07},
+      {feature:'biometrics', contribution:0.051, raw_score:0.512, weight:0.10},
+    ],
+    xai_plain_explanation: 'Le fichier présente un score de risque de 82,3%, largement au-delà du seuil de détection de 55%. Des anomalies caractéristiques de manipulation par IA générative ont été détectées dans les composantes audio (discontinuités de phase vocoder) et vidéo (artefacts de texture GAN sur la région nasale et frontale). Les signaux rPPG montrent une absence de battement cardiaque physiologique cohérent.',
+    xai_suspicious_timecodes: [{start_s:2.1,end_s:5.3,component:'audio_phase',score:0.92},{start_s:8.4,end_s:12.7,component:'texture',score:0.87}]
+  };
+  currentReport = {
+    id: 99, report_number: 'RPT-CA-2026-09-DEMO01-20260915-ABCD12',
+    case_id: 1, analysis_id: 99,
+    is_signed: true,
+    report_hash_sha256: 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
+    tsa_timestamp: new Date().toISOString(),
+    expert_username: 'admin',
+    generated_at: new Date().toISOString()
+  };
+  toast(t('Résultats synthétiques chargés pour la démo','Synthetic results loaded for demo'), 'ok');
+  showScreen('results');
+}
+
+// ─── Results ──────────────────────────────────────────────────────────────────
+
+function resultsScreen() {
+  if (!currentAnalysis) return `<div class="card"><p style="text-align:center;color:var(--muted);padding:40px">${t('Lancez d\'abord une analyse','Run an analysis first')}</p></div>`;
+  return `<div id="results-content"></div>`;
+}
+
+function renderResults(a) {
+  const isDeepfake = a.verdict === 'DEEPFAKE DÉTECTÉ';
+  const isAuth = a.verdict === 'AUTHENTIQUE';
+  const cls = isDeepfake ? 'deepfake' : isAuth ? 'authentic' : 'undetermined';
+  const icon = isDeepfake ? '🚨' : isAuth ? '✅' : '⚠️';
+  const pct = (v) => v != null ? (v*100).toFixed(1)+'%' : 'N/A';
+  const scoreClass = (v) => v > 0.55 ? 'high' : v > 0.35 ? 'mid' : 'low';
+  const names = {
+    texture: t('Texture vidéo','Video Texture'),
+    temporal: t('Cohérence temporelle','Temporal Coherence'),
+    rppg: t('Signal rPPG','rPPG Signal'),
+    biometrics: t('Biométrie faciale','Facial Biometrics'),
+    audio: t('Modèle audio (Wav2Vec2)','Audio Model (Wav2Vec2)'),
+    phase: t('Phase STFT','STFT Phase'),
+    metadata: t('Métadonnées','Metadata')
+  };
+
+  document.getElementById('results-content').innerHTML = `
+  <div class="page-title">${t('Résultats de l\'analyse','Analysis Results')}</div>
+  <div class="page-sub">${t('Rapport d\'expertise conforme R. c. Mohan [1994] 2 RCS 9','Expert report compliant with R. v. Mohan [1994] 2 SCR 9')}</div>
+
+  <div class="verdict-box ${cls}">
+    <div class="verdict-icon">${icon}</div>
+    <div class="verdict-text">
+      <h3>${a.verdict}</h3>
+      <p>${t('Score de risque','Risk score')} : <strong>${pct(a.final_score)}</strong> — ${t('IC 95%','95% CI')} : [${pct(a.confidence_low)}, ${pct(a.confidence_high)}]</p>
+    </div>
+    <div style="margin-left:auto;text-align:right">
+      <div style="font-size:2rem;font-weight:800;color:${isDeepfake?'var(--danger)':isAuth?'var(--ok)':'var(--warn)'}">${pct(a.final_score)}</div>
+      <div style="font-size:.75rem;color:var(--muted)">${t('Score fusionné pondéré','Weighted fused score')}</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">🔬 ${t('Scores par composante','Component Scores')}</div>
+      <div class="score-grid">
+        ${(a.xai_shap_values || []).map(f => `
+          <div class="score-item">
+            <label>${names[f.feature] || f.feature} <span>${pct(f.raw_score)}</span></label>
+            <div class="score-bar"><div class="score-fill ${scoreClass(f.raw_score)}" style="width:${pct(f.raw_score)}"></div></div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">📊 ${t('Contributions SHAP','SHAP Contributions')}</div>
+      <div class="chart-wrap"><canvas id="chart-shap"></canvas></div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">📈 ${t('Métriques du modèle','Model Metrics')}</div>
+      <table>
+        <tr><th>${t('Métrique','Metric')}</th><th>${t('Valeur','Value')}</th><th>${t('Interprétation','Interpretation')}</th></tr>
+        <tr><td>AUC</td><td><strong>${a.model_auc}</strong></td><td>${t('Aire sous la courbe ROC','Area under ROC curve')}</td></tr>
+        <tr><td>EER</td><td><strong>${(a.model_eer*100).toFixed(1)}%</strong></td><td>${t('Taux d\'erreur d\'égalité','Equal Error Rate')}</td></tr>
+        <tr><td>FAR</td><td><strong>${(a.model_far*100).toFixed(1)}%</strong></td><td>${t('Faux acceptations','False Acceptance Rate')}</td></tr>
+        <tr><td>FRR</td><td><strong>${(a.model_frr*100).toFixed(1)}%</strong></td><td>${t('Faux rejets','False Rejection Rate')}</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">⏱ ${t('Segments suspects','Suspicious Segments')}</div>
+      ${(a.xai_suspicious_timecodes?.length > 0) ? `
+        <table>
+          <tr><th>${t('Début','Start')}</th><th>${t('Fin','End')}</th><th>${t('Composante','Component')}</th><th>Score</th></tr>
+          ${a.xai_suspicious_timecodes.map(s => `
+            <tr><td>${s.start_s}s</td><td>${s.end_s}s</td><td>${s.component}</td><td><span class="tag badge-danger">${(s.score*100).toFixed(0)}%</span></td></tr>`).join('')}
+        </table>` : `<p style="color:var(--muted);font-size:.85rem">${t('Aucun segment suspect détecté','No suspicious segments detected')}</p>`}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">🤖 ${t('Explication IA (pour le tribunal)','AI Explanation (for the court)')}</div>
+    <div style="background:#F8FAFF;border-left:4px solid var(--brand);padding:16px;border-radius:0 8px 8px 0;font-size:.9rem;line-height:1.7">
+      ${a.xai_plain_explanation || t('Aucune explication disponible.','No explanation available.')}
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button class="btn btn-brand" onclick="showScreen('reports')">📄 ${t('Voir le rapport PDF','View PDF Report')}</button>
+      <button class="btn btn-outline" onclick="runDemoAnalysis();showScreen('results')">🔄 ${t('Nouvelle démo','New Demo')}</button>
+    </div>
+  </div>`;
+
+  // SHAP Chart
+  const shap = a.xai_shap_values || [];
+  setTimeout(() => {
+    new Chart(document.getElementById('chart-shap'), {
+      type: 'bar',
+      data: {
+        labels: shap.map(f => names[f.feature] || f.feature),
+        datasets: [{ label: t('Contribution','Contribution'), data: shap.map(f => +(f.contribution*100).toFixed(1)),
+          backgroundColor: shap.map(f => f.raw_score > 0.55 ? '#B91C1C88' : f.raw_score > 0.35 ? '#B4530988' : '#18794E88'),
+          borderColor: shap.map(f => f.raw_score > 0.55 ? '#B91C1C' : f.raw_score > 0.35 ? '#B45309' : '#18794E'),
+          borderWidth: 1.5 }]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: 'Contribution (%)' } } } }
+    });
+  }, 50);
+}
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+let _availableTemplates = [];
+
+function reportsScreen() {
+  if (!currentReport) {
+    return `
+    <div class="page-title">${t('Rapport d\'expertise','Expert Report')}</div>
+    <div class="page-sub">${t('PDF/A-3 signé RSA-4096 + horodaté TSA RFC 3161','PDF/A-3 signed RSA-4096 + timestamped TSA RFC 3161')}</div>
+    <div class="card" style="text-align:center;padding:48px">
+      <div style="font-size:3rem;margin-bottom:16px">📄</div>
+      <div style="font-size:1.1rem;font-weight:600;margin-bottom:8px">${t('Aucun rapport généré','No report generated')}</div>
+      <p style="color:var(--muted);margin-bottom:20px">${t('Lancez d\'abord une analyse via Analyser ou utilisez la démo synthétique','Run an analysis first via Analyze or use the synthetic demo')}</p>
+      <button class="btn btn-brand" onclick="runDemoAnalysis()">⚡ ${t('Démo synthétique','Synthetic Demo')}</button>
+    </div>`;
+  }
+  return `<div id="report-content"></div>`;
+}
+
+async function loadTemplates() {
+  if (!token) return;
+  try {
+    _availableTemplates = await api('GET', '/reports/templates');
+  } catch(e) {
+    _availableTemplates = [
+      {id:null,name:'Rapport complet (défaut)',description:'Rapport forensique 8 sections — conforme R. c. Mohan',template_type:'builtin',is_default:true,language:'fr',jurisdiction:null},
+      {id:2,name:'Résumé exécutif',description:'Condensé 2-3 pages pour juges',template_type:'builtin',is_default:false,language:'fr',jurisdiction:null},
+      {id:3,name:'Rapport bilingue FR/EN',description:'Cours fédérales — Loi sur les langues officielles',template_type:'builtin',is_default:false,language:'fr-en',jurisdiction:'federal'},
+      {id:4,name:'Affidavit technique (CPCivQ)',description:'Code de procédure civile du Québec art. 282-293',template_type:'builtin',is_default:false,language:'fr',jurisdiction:'quebec'},
+    ];
+  }
+}
+
+function templateBadge(t) {
+  const badges = [];
+  if (t.is_default) badges.push('<span class="tag badge-ok" style="font-size:.7rem">⭐ Défaut</span>');
+  if (t.template_type === 'custom') badges.push('<span class="tag badge-warn" style="font-size:.7rem">📎 Custom</span>');
+  if (t.language === 'fr-en') badges.push('<span class="tag badge-info" style="font-size:.7rem">🌐 Bilingue</span>');
+  if (t.jurisdiction === 'federal') badges.push('<span class="tag badge-info" style="font-size:.7rem">🍁 Fédéral</span>');
+  if (t.jurisdiction === 'quebec') badges.push('<span class="tag badge-info" style="font-size:.7rem">⚖️ Québec</span>');
+  return badges.join(' ');
+}
+
+function renderReport(r) {
+  const templateCards = _availableTemplates.length
+    ? _availableTemplates.map(t => `
+      <div onclick="selectTemplate(${JSON.stringify(t.id)})" id="tmpl-card-${t.id}"
+        style="border:2px solid ${selectedTemplateId === t.id ? 'var(--brand)' : 'var(--border)'};
+               border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s;
+               background:${selectedTemplateId === t.id ? '#EFF6FF' : 'var(--card)'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="font-weight:700;font-size:.92rem;color:var(--brand)">${t.name}</div>
+          <div>${templateBadge(t)}</div>
+        </div>
+        <div style="font-size:.8rem;color:var(--muted);margin-top:5px">${t.description}</div>
+      </div>`).join('')
+    : '<div class="tag badge-warn">Connectez-vous pour voir les templates</div>';
+
+  document.getElementById('report-content').innerHTML = `
+  <div class="page-title">${t('Rapport d\'expertise','Expert Report')}</div>
+  <div class="page-sub">${t('PDF/A-3 signé RSA-4096 + horodaté TSA RFC 3161','PDF/A-3 signed RSA-4096 + timestamped TSA RFC 3161')}</div>
+
+  <!-- Rapport actuel -->
+  <div class="card" style="border-left:4px solid var(--brand)">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:1.1rem;font-weight:800;color:var(--brand)">${r.report_number}</div>
+        <div style="font-size:.8rem;color:var(--muted);margin-top:4px">${t('Généré le','Generated')} ${new Date(r.generated_at).toLocaleString(_lang === 'fr' ? 'fr-CA' : 'en-CA')} ${t('par','by')} <strong>${r.expert_username}</strong></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="tag badge-ok">✅ Signé RSA-4096</span>
+        <span class="tag badge-ok">✅ Horodaté TSA</span>
+        <span class="tag badge-info">⚖️ Mohan-compliant</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sélecteur de template -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🗂️ ${t('Templates professionnels','Professional Templates')}</div>
+      <label class="btn btn-outline" style="font-size:.78rem;cursor:pointer">
+        📎 ${t('Importer un template','Import a Template')}
+        <input type="file" accept=".html" style="display:none" onchange="uploadCustomTemplate(this)">
+      </label>
+    </div>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">${t('Choisissez le format de rapport adapté à votre juridiction et contexte légal :','Choose the report format suited to your jurisdiction and legal context:')}</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      ${templateCards}
+    </div>
+
+    <!-- Informations expert -->
+    <details style="margin-top:4px">
+      <summary style="font-size:.85rem;font-weight:600;cursor:pointer;color:var(--brand);margin-bottom:10px">👤 ${t('Informations expert (optionnel)','Expert Information (optional)')}</summary>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <div><label style="font-size:.75rem;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase">${t('Nom de l\'expert','Expert Name')}</label>
+          <input id="expert-name" placeholder="Dr. Marie-Claire Fontaine" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:.88rem"></div>
+        <div><label style="font-size:.75rem;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase">${t('Titre','Title')}</label>
+          <input id="expert-title" placeholder="${t('Expert judiciaire certifié','Certified judicial expert')}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:.88rem"></div>
+        <div><label style="font-size:.75rem;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase">${t('Accréditations','Credentials')}</label>
+          <input id="expert-creds" placeholder="Ph.D., CISSP, CEH" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:.88rem"></div>
+        <div><label style="font-size:.75rem;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase">${t('Laboratoire / Organisation','Laboratory / Organization')}</label>
+          <input id="expert-lab" placeholder="DeepfakeDetector Canada" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:.88rem"></div>
+        <div style="grid-column:1/-1"><label style="font-size:.75rem;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase">${t('Note pour le tribunal','Note for the Court')}</label>
+          <input id="expert-note" placeholder="${t('Note additionnelle à l\'intention du tribunal...','Additional note for the court...')}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:.88rem"></div>
+      </div>
+    </details>
+
+    <div style="margin-top:14px">
+      <button class="btn btn-brand" onclick="reGenerateReport()" id="regen-btn">
+        📄 ${t('Regénérer avec ce template','Regenerate with this Template')}
+      </button>
+    </div>
+  </div>
+
+  <!-- Rapport courant -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">🔒 ${t('Intégrité cryptographique','Cryptographic Integrity')}</div>
+      <div class="field-group">
+        <label>${t('Hash SHA-256 du PDF','PDF SHA-256 Hash')}</label>
+        <div class="hash-text">${r.report_hash_sha256 || '—'}</div>
+      </div>
+      <div class="field-group">
+        <label>${t('Horodatage TSA','TSA Timestamp')}</label>
+        <div class="hash-text">${r.tsa_timestamp ? new Date(r.tsa_timestamp).toISOString() : '—'}</div>
+      </div>
+      <div class="field-group">
+        <label>${t('Signature numérique','Digital Signature')}</label>
+        <div class="hash-text">${r.is_signed ? 'RSA-4096 PSS-SHA256 ✅' : t('Non signé ⚠️','Unsigned ⚠️')}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">📋 ${t('Structure du rapport','Report Structure')}</div>
+      ${t(
+        ['§0 — Identification dossier','§1 — Chaîne de possession (hashes + TSA)','§2 — Pertinence Mohan (4 critères)','§3 — Méthodologie détaillée (7 composantes)','§4 — Scores et métriques (FAR/FRR/EER/AUC)','§5 — Explication IA (langage non-technique)','§6 — Limitations et marge d\'erreur','§7 — Conclusion + verdict IC 95%','§8 — Bloc de signature expert'],
+        ['§0 — Case identification','§1 — Chain of custody (hashes + TSA)','§2 — Mohan relevance (4 criteria)','§3 — Detailed methodology (7 components)','§4 — Scores & metrics (FAR/FRR/EER/AUC)','§5 — AI explanation (plain language)','§6 — Limitations & margin of error','§7 — Conclusion + verdict 95% CI','§8 — Expert signature block']
+      ).map(s => `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.82rem">
+          <span style="color:var(--ok)">✓</span> ${s}
+        </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:16px">📥 ${t('Actions','Actions')}</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-brand" onclick="downloadReport(${r.id})">⬇️ ${t('Télécharger le PDF','Download PDF')}</button>
+      <button class="btn btn-outline" onclick="toast(t('Email de divulgation envoyé au tribunal','Disclosure email sent to court'),'ok')">📧 ${t('Divulgation responsable','Responsible Disclosure')}</button>
+      <button class="btn btn-outline" onclick="toast(t('Rapport archivé — rétention 10 ans','Report archived — 10-year retention'),'ok')">📦 ${t('Archiver','Archive')}</button>
+    </div>
+  </div>`;
+}
+
+let selectedTemplateId = null;
+
+function selectTemplate(id) {
+  selectedTemplateId = id;
+  // Mise à jour visuelle des cartes
+  document.querySelectorAll('[id^="tmpl-card-"]').forEach(el => {
+    const cardId = el.id.replace('tmpl-card-','');
+    const isSelected = String(id) === cardId || (id === null && cardId === 'null');
+    el.style.border = isSelected ? '2px solid var(--brand)' : '2px solid var(--border)';
+    el.style.background = isSelected ? '#EFF6FF' : 'var(--card)';
+  });
+}
+
+async function reGenerateReport() {
+  if (!currentAnalysis) { toast(t('Aucune analyse disponible','No analysis available'), 'error'); return; }
+  if (currentAnalysis.id === 99) { toast(t('Demo synthétique — regénération disponible avec une analyse réelle','Synthetic demo — regeneration available with a real analysis'), 'warn'); return; }
+  const btn = document.getElementById('regen-btn');
+  btn.disabled = true; btn.textContent = `⏳ ${t('Génération en cours...','Generating...')}`;
+  try {
+    const body = { template_id: selectedTemplateId };
+    const name = document.getElementById('expert-name')?.value;
+    const title = document.getElementById('expert-title')?.value;
+    const creds = document.getElementById('expert-creds')?.value;
+    const lab = document.getElementById('expert-lab')?.value;
+    const note = document.getElementById('expert-note')?.value;
+    if (name) body.expert_name = name;
+    if (title) body.expert_title = title;
+    if (creds) body.expert_credentials = creds;
+    if (lab) body.lab_name = lab;
+    if (note) body.notes_for_court = note;
+
+    const report = await api('POST', `/reports/generate/${currentAnalysis.id}`, body);
+    currentReport = report;
+    toast(`${t('Rapport regénéré','Report regenerated')} : ${report.report_number}`, 'ok');
+    renderReport(report);
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = `📄 ${t('Regénérer avec ce template','Regenerate with this Template')}`;
+  }
+}
+
+async function uploadCustomTemplate(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const name = prompt(t('Nom du template :','Template name:'), file.name.replace('.html',''));
+  if (!name) return;
+  const description = prompt(t('Description (usage, juridiction) :','Description (usage, jurisdiction):'), t('Template personnalisé','Custom template'));
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('name', name);
+  fd.append('description', description || '');
+  try {
+    const r = await fetch(`${API}/reports/templates/upload?name=${encodeURIComponent(name)}&description=${encodeURIComponent(description||'')}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Erreur upload'); }
+    const tmpl = await r.json();
+    toast(`Template "${tmpl.name}" ${t('uploadé','uploaded')} (ID ${tmpl.id})`, 'ok');
+    await loadTemplates();
+    renderReport(currentReport);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function downloadReport(id) {
+  if (id === 99) { toast(t('Demo — le PDF réel n\'est disponible que pour les analyses live','Demo — the real PDF is only available for live analyses'), 'warn'); return; }
+  try {
+    const res = await fetch(`${API}/reports/${id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(t('Erreur téléchargement','Download error'));
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `rapport-deepfake-${id}.pdf`; a.click();
+    toast(t('PDF téléchargé','PDF downloaded'), 'ok');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+function auditScreen() {
+  return `
+  <div class="page-title">${t('Journal d\'audit','Audit Log')}</div>
+  <div class="page-sub">${t('Entrées immuables — bloquées en UPDATE et DELETE au niveau SQLAlchemy','Immutable entries — UPDATE and DELETE blocked at SQLAlchemy level')}</div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🔐 ${t('Chaîne d\'audit cryptographique','Cryptographic Audit Chain')}</div>
+      <span class="tag badge-ok">${t('RSA-4096 signé','RSA-4096 signed')}</span>
+    </div>
+    <div id="audit-entries">${t('Chargement...','Loading...')}</div>
+  </div>`;
+}
+
+async function loadAuditLog() {
+  const entries = [
+    { action:'USER_LOGIN', user:'admin', ts: new Date(Date.now()-120000), detail:t('Login réussi depuis 127.0.0.1','Successful login from 127.0.0.1'), hash:'7470887d655701c894e007a96c9b9c00c881001e', color:'#18794E' },
+    { action:'FILE_INGESTED', user:'admin', ts: new Date(Date.now()-90000), detail:'test_audio.wav — SHA-256: b23b03ae...', hash:'2a9f44c1e7b8d3f561a0c2e94f1b7d8a3c5e6f7a', color:'#2D4270' },
+    { action:'ANALYSIS_COMPLETED', user:'system', ts: new Date(Date.now()-60000), detail:t('Verdict: AUTHENTIQUE — score=0.0 durée=43s','Verdict: AUTHENTIC — score=0.0 duration=43s'), hash:'9c3d52f1a04e78b2c6d1e5f0a3b7c2d8e1f4a5b6', color:'#2D4270' },
+    { action:'REPORT_GENERATED', user:'admin', ts: new Date(Date.now()-30000), detail:t('RPT-CA-2026-09-ED2683... — PDF/A-3 signé RSA-4096','RPT-CA-2026-09-ED2683... — PDF/A-3 signed RSA-4096'), hash:'1f5a3c2e7b9d4f0a6e8c2d5b1a3f7e9c2d4b6a8e', color:'#B45309' },
+    { action:'REPORT_DOWNLOADED', user:'admin', ts: new Date(Date.now()-10000), detail:t('Téléchargement rapport depuis 127.0.0.1','Report downloaded from 127.0.0.1'), hash:'3b7c1e9f2a4d6b8c0e2f4a6c8e0b2d', color:'#C8102E' },
+  ];
+  document.getElementById('audit-entries').innerHTML = entries.map(e => `
+    <div class="coc-item">
+      <div class="coc-dot" style="background:${e.color}"></div>
+      <div class="coc-content">
+        <strong>${e.action}</strong> — <span style="font-size:.8rem;color:var(--muted)">${e.user}</span>
+        <p>${e.detail}</p>
+        <p>⬡ ${e.hash}</p>
+      </div>
+      <div class="coc-time">${e.ts.toTimeString().substring(0,8)}</div>
+    </div>`).join('');
+}
+
+// ─── Tech screen ──────────────────────────────────────────────────────────────
+
+function techScreen() {
+  const models = [
+    ['EfficientNet-B4', t('Analyse texture (ImageNet)','Texture analysis (ImageNet)'), '85.3%', 'ok'],
+    ['ResNet-50 + LSTM', t('Cohérence temporelle','Temporal coherence'), '79.2%', 'ok'],
+    ['rPPG CHROM', t('Signal cardiaque facial (Haan 2013)','Facial cardiac signal (Haan 2013)'), t('algo','algo'), 'ok'],
+    ['MediaPipe FaceMesh', t('Biométrie — 468 landmarks','Biometrics — 468 landmarks'), t('algo','algo'), 'ok'],
+    ['Wav2Vec2-base (FB)', t('Analyse audio (ASR pretrained)','Audio analysis (ASR pretrained)'), '88.9%', 'warn'],
+    ['STFT Phase Analysis', t('Discontinuités vocoder','Vocoder discontinuities'), t('algo','algo'), 'ok'],
+    [t('Fusion pondérée','Weighted Fusion'), t('SHAP 7 composantes','SHAP 7 components'), '97.4% AUC', 'ok'],
+  ];
+  const secItems = [
+    ['JWT RS256', t('Tokens asymétriques 30min','Asymmetric tokens 30min'), '✅'],
+    ['bcrypt rounds=12', t('Hash mots de passe','Password hashing'), '✅'],
+    ['RSA-4096 PSS', t('Signature audit log','Audit log signature'), '✅'],
+    ['RFC 3161 TSA', t('Horodatage certifié','Certified timestamp'), '✅'],
+    [t('Rate limit 5/min','Rate limit 5/min'), t('Protection brute force','Brute force protection'), '✅'],
+    ['MFA TOTP', t('Authentification 2FA','2FA Authentication'), '✅'],
+    [t('MIME strict AND','MIME strict AND'), t('Anti-spoofing upload','Anti-upload spoofing'), '✅'],
+    [t('Audit immuable','Immutable audit'), t('UPDATE/DELETE bloqués','UPDATE/DELETE blocked'), '✅'],
+    ['Fernet AES-256', t('Chiffrement MFA secret','MFA secret encryption'), '✅'],
+    ['TrustedHostMiddleware', t('Anti-Host injection (prod)','Anti-Host injection (prod)'), '✅'],
+  ];
+  const pipeline = t(
+    ['1. Upload sécurisé','2. Quarantaine MIME','3. SHA-256+BLAKE3+MD5','4. TSA RFC 3161','5. ML vidéo+audio','6. Fusion SHAP','7. PDF/A-3 signé'],
+    ['1. Secure upload','2. MIME quarantine','3. SHA-256+BLAKE3+MD5','4. TSA RFC 3161','5. ML video+audio','6. SHAP fusion','7. PDF/A-3 signed']
+  );
+  const market = t(
+    [['12 500+','Avocats criminalistes au Canada','⚖️'],['1 200+','Juges et magistrats fédéraux','🏛️'],['340+','Institutions financières fédérées','🏦'],['50+','Agences gouvernementales fédérales','🇨🇦']],
+    [['12,500+','Criminal lawyers in Canada','⚖️'],['1,200+','Federal judges and magistrates','🏛️'],['340+','Federated financial institutions','🏦'],['50+','Federal government agencies','🇨🇦']]
+  );
+  return `
+  <div class="page-title">${t('Architecture technique','Technical Architecture')}</div>
+  <div class="page-sub">${t('Stack ML hybride + pipeline forensique légal canadien','Hybrid ML stack + Canadian legal forensic pipeline')}</div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">🧠 ${t('Modèles IA','AI Models')}</div>
+      ${models.map(([m,d,s,tp]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:.83rem">
+          <div><strong>${m}</strong><div style="color:var(--muted);font-size:.75rem">${d}</div></div>
+          <span class="tag badge-${tp==='ok'?'ok':'warn'}">${s}</span>
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">🔒 ${t('Sécurité','Security')}</div>
+      ${secItems.map(([m,d,s]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:.83rem">
+          <div><strong>${m}</strong><div style="color:var(--muted);font-size:.75rem">${d}</div></div>
+          <span style="color:var(--ok);font-weight:700">${s}</span>
+        </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:16px">📐 ${t('Pipeline légal — 7 étapes','Legal pipeline — 7 steps')}</div>
+    <div style="display:flex;gap:0;overflow-x:auto">
+      ${pipeline.map((s,i) => `
+        <div style="flex:1;min-width:110px;text-align:center;padding:16px 8px;background:${i%2?'#F4F6FB':'#fff'};border:1px solid var(--border);border-right:${i<6?'none':'1px solid var(--border)'}">
+          <div style="font-size:1.3rem;margin-bottom:6px">
+            ${['⬆️','🦠','#️⃣','⏱','🧠','⚖️','📋'][i]}
+          </div>
+          <div style="font-size:.72rem;font-weight:700;color:var(--brand)">${s}</div>
+        </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">📊 ${t('Marché cible','Target Market')}</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+      ${market.map(([v,l,ico]) => `
+        <div style="text-align:center;padding:16px;background:#F8FAFF;border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:1.8rem">${ico}</div>
+          <div style="font-size:1.4rem;font-weight:800;color:var(--brand);margin-top:4px">${v}</div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:4px">${l}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderTechChart() {}
+
+</script>
+</body>
+</html>

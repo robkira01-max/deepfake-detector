@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Template Test {{ report_number }}</title></head>
+<body>
+<h1>Rapport de test custom</h1>
+<p>Dossier: {{ case.case_number }} | Verdict: {{ analysis.verdict }}</p>
+<p>Score: {{ "%.1f"|format(analysis.final_score * 100) }}%</p>
+<p>Expert: {{ expert_name }}</p>
+</body></html>

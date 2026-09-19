@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Rapport d'Expertise Forensique — {{ report_number }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 2cm 2.5cm;
+      @top-center { content: "CONFIDENTIEL — USAGE LÉGAL UNIQUEMENT"; font-size: 9pt; color: #dc3545; }
+      @bottom-right { content: "Page " counter(page) " / " counter(pages); font-size: 9pt; }
+      @bottom-left { content: "{{ report_number }}"; font-size: 9pt; color: #6c757d; }
+    }
+    body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10pt; color: #212529; line-height: 1.5; }
+    h1 { font-size: 18pt; color: #1a237e; border-bottom: 3px solid #1a237e; padding-bottom: 8px; }
+    h2 { font-size: 13pt; color: #1a237e; border-left: 4px solid #1a237e; padding-left: 10px; margin-top: 24px; }
+    h3 { font-size: 11pt; color: #37474f; }
+    .header-block { background: #f8f9fa; border: 1px solid #dee2e6; padding: 16px; margin-bottom: 20px; border-radius: 4px; }
+    .verdict-box {
+      background: {{ verdict_color }}22;
+      border: 3px solid {{ verdict_color }};
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    .verdict-label { font-size: 22pt; font-weight: bold; color: {{ verdict_color }}; }
+    .verdict-score { font-size: 14pt; color: #37474f; margin-top: 8px; }
+    .score-bar-container { background: #e9ecef; border-radius: 4px; height: 20px; margin: 4px 0; }
+    .score-bar { height: 20px; border-radius: 4px; background: {{ verdict_color }}; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 9.5pt; }
+    th { background: #1a237e; color: white; padding: 7px 10px; text-align: left; }
+    td { padding: 6px 10px; border-bottom: 1px solid #dee2e6; }
+    tr:nth-child(even) td { background: #f8f9fa; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 8.5pt; font-weight: bold; }
+    .badge-red { background: #dc3545; color: white; }
+    .badge-orange { background: #fd7e14; color: white; }
+    .badge-green { background: #28a745; color: white; }
+    .badge-grey { background: #6c757d; color: white; }
+    .hash-block { font-family: monospace; font-size: 8pt; background: #f1f3f5; padding: 8px; border-radius: 3px; word-break: break-all; }
+    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 8px 0; }
+    .section-num { color: #1a237e; font-weight: bold; }
+    .plain-explanation { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 14px; border-radius: 0 4px 4px 0; font-size: 10.5pt; }
+    .signature-block { border: 2px solid #1a237e; padding: 16px; margin-top: 20px; background: #f8f9fa; }
+    .legal-ref { font-size: 8.5pt; color: #6c757d; font-style: italic; }
+    .page-break { page-break-after: always; }
+    .confidential-watermark { color: #dc354520; font-size: 60pt; font-weight: bold; position: fixed; top: 40%; left: 10%; transform: rotate(-30deg); z-index: -1; }
+  </style>
+</head>
+<body>
+
+<div class="confidential-watermark">CONFIDENTIEL</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- EN-TÊTE -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h1>RAPPORT D'ANALYSE FORENSIQUE DEEPFAKE</h1>
+<div class="header-block">
+  <table>
+    <tr><td><strong>Numéro de rapport</strong></td><td class="hash-block">{{ report_number }}</td></tr>
+    <tr><td><strong>Date de production</strong></td><td>{{ generated_at }}</td></tr>
+    <tr><td><strong>Dossier</strong></td><td>{{ case.case_number }} — {{ case.title }}</td></tr>
+    <tr><td><strong>Juridiction</strong></td><td>{{ case.jurisdiction.value | upper }}</td></tr>
+    <tr><td><strong>Expert signataire</strong></td><td>{{ expert.username }} ({{ expert.role.value }})</td></tr>
+    <tr><td><strong>Statut</strong></td><td><span class="badge badge-red">CONFIDENTIEL</span></td></tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- VERDICT -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div class="verdict-box">
+  <div class="verdict-label">{{ verdict_label }}</div>
+  <div class="verdict-score">Score de risque : {{ final_score_pct }} — IC 95% : [{{ ic_low_pct }}, {{ ic_high_pct }}]</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- §1 — IDENTIFICATION ET CHAÎNE DE POSSESSION -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h2><span class="section-num">§1</span> — Identification et chaîne de possession numérique</h2>
+<p class="legal-ref">Conforme : {{ lpc_reference }} | {{ dgsi_reference }}</p>
+<table>
+  <tr><th colspan="2">Fichier soumis à l'analyse</th></tr>
+  <tr><td>Nom original</td><td>{{ media_file.original_filename }}</td></tr>
+  <tr><td>Type</td><td>{{ media_file.media_type.value | upper }} — {{ media_file.mime_type }}</td></tr>
+  <tr><td>Taille</td><td>{{ "{:,}".format(media_file.file_size_bytes) }} octets</td></tr>
+  <tr><td>UUID de traçabilité</td><td class="hash-block">{{ media_file.uuid }}</td></tr>
+  <tr><td>Empreinte SHA-256</td><td class="hash-block">{{ media_file.hash_sha256 }}</td></tr>
+  <tr><td>Empreinte BLAKE3</td><td class="hash-block">{{ media_file.hash_blake3 }}</td></tr>
+  <tr><td>Empreinte MD5 (compatibilité)</td><td class="hash-block">{{ media_file.hash_md5 }}</td></tr>
+  <tr><td>Horodatage TSA (RFC 3161)</td><td>{{ tsa_timestamp }}</td></tr>
+  <tr><td>Autorité TSA</td><td>{{ tsa_authority }}</td></tr>
+  <tr><td>Date d'ingestion</td><td>{{ media_file.ingested_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- §2 — DÉCLARATION DE PERTINENCE (R. c. Mohan critère 1) -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h2><span class="section-num">§2</span> — Déclaration de pertinence</h2>
+<p class="legal-ref">Critère Mohan 1 : « Le témoignage doit être pertinent à un fait en litige. »</p>
+<p>
+  Le présent rapport vise à déterminer si le fichier soumis (UUID : <code>{{ media_file.uuid }}</code>)
+  a été produit ou altéré par des technologies d'intelligence artificielle génératives
+  (communément appelées « deepfake »). Cette question dépasse les connaissances ordinaires
+  d'un juge ou d'un jury, ce qui justifie le recours à une expertise forensique spécialisée.
+</p>
+<p>
+  Le dossier concerné est : <strong>{{ case.case_number }} — {{ case.title }}</strong>
+  {% if case.plaintiff or case.defendant %}
+  ({{ case.plaintiff or "N/A" }} c. {{ case.defendant or "N/A" }})
+  {% endif %}
+</p>
+
+<!-- §3 — MÉTHODOLOGIE -->
+<h2><span class="section-num">§3</span> — Méthodologie d'analyse</h2>
+<p class="legal-ref">Critère Mohan 2-3 : Nécessité et méthode reconnue — R. c. J.-L.J. [2000] 2 RCS 600</p>
+<p>L'analyse a été réalisée par le moteur DeepfakeDetector v{{ "1.0.0" }} selon les composantes suivantes :</p>
+<table>
+  <tr>
+    <th>Composante</th><th>Technique</th><th>Modèle</th><th>Dataset d'entraînement</th>
+  </tr>
+  <tr><td>Texture visage</td><td>Swin Transformer V2</td><td>swin_transformer_v2_deepfake</td><td>FaceForensics++, DFDC, CelebDF-v2</td></tr>
+  <tr><td>Cohérence temporelle</td><td>ResNet-50 + LSTM</td><td>resnet50_lstm_temporal</td><td>FaceForensics++, FaceShifter</td></tr>
+  <tr><td>Physiologie (rPPG)</td><td>CHROM + POS + FFT</td><td>rppg_chrom_pos</td><td>Signal sanguin réel vs synthétique</td></tr>
+  <tr><td>Biométrie comportementale</td><td>EAR + AU OpenFace</td><td>mediapipe_facemesh</td><td>FakeAVCeleb, WildDeepfake</td></tr>
+  <tr><td>Voix synthétique</td><td>Wav2Vec2 + RawNet3 + AASIST</td><td>wav2vec2_large_deepfake</td><td>ASVspoof 2021, WaveFake</td></tr>
+  <tr><td>Continuité de phase</td><td>STFT + analyse STOI</td><td>phase_continuity_detector</td><td>LibriSeVoc, WaveFake</td></tr>
+  <tr><td>Métadonnées</td><td>FFprobe + EXIF</td><td>metadata_consistency</td><td>Heuristiques forensiques</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- §4 — RÉSULTATS DÉTAILLÉS -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h2><span class="section-num">§4</span> — Résultats détaillés</h2>
+
+<h3>4.1 Scores par composante</h3>
+<table>
+  <tr><th>Composante</th><th>Score</th><th>Niveau de risque</th></tr>
+  <tr>
+    <td>Texture visage (Swin-T V2)</td>
+    <td>{{ score_texture_pct }}</td>
+    <td>
+      <div class="score-bar-container"><div class="score-bar" style="width:{{ score_texture_pct }};"></div></div>
+    </td>
+  </tr>
+  <tr>
+    <td>Cohérence temporelle (ResNet+LSTM)</td>
+    <td>{{ score_temporal_pct }}</td>
+    <td><div class="score-bar-container"><div class="score-bar" style="width:{{ score_temporal_pct }};"></div></div></td>
+  </tr>
+  <tr>
+    <td>Signal physiologique rPPG</td>
+    <td>{{ score_rppg_pct }}</td>
+    <td><div class="score-bar-container"><div class="score-bar" style="width:{{ score_rppg_pct }};"></div></div></td>
+  </tr>
+  <tr>
+    <td>Biométrie comportementale</td>
+    <td>{{ score_biometrics_pct }}</td>
+    <td><div class="score-bar-container"><div class="score-bar" style="width:{{ score_biometrics_pct }};"></div></div></td>
+  </tr>
+  <tr>
+    <td>Modèle vocal (Wav2Vec2+AASIST)</td>
+    <td>{{ score_audio_pct }}</td>
+    <td><div class="score-bar-container"><div class="score-bar" style="width:{{ score_audio_pct }};"></div></div></td>
+  </tr>
+  <tr>
+    <td>Continuité de phase audio</td>
+    <td>{{ score_phase_pct }}</td>
+    <td><div class="score-bar-container"><div class="score-bar" style="width:{{ score_phase_pct }};"></div></div></td>
+  </tr>
+  <tr>
+    <td>Cohérence des métadonnées</td>
+    <td>{{ score_metadata_pct }}</td>
+    <td><div class="score-bar-container"><div class="score-bar" style="width:{{ score_metadata_pct }};"></div></div></td>
+  </tr>
+</table>
+
+<h3>4.2 Métriques de performance du modèle</h3>
+<p class="legal-ref">
+  Ces métriques permettent au tribunal d'évaluer le risque d'erreur du système,
+  conformément à R. c. J.-L.J. [2000] 2 RCS 600 (fiabilité de la méthode scientifique).
+</p>
+<table>
+  <tr><th>Métrique</th><th>Valeur</th><th>Définition</th></tr>
+  <tr><td>FAR (Taux de fausse acceptation)</td><td><strong>{{ far_pct }}</strong></td><td>Deepfake accepté comme authentique</td></tr>
+  <tr><td>FRR (Taux de faux rejet)</td><td><strong>{{ frr_pct }}</strong></td><td>Authentique rejeté comme deepfake</td></tr>
+  <tr><td>EER (Equal Error Rate)</td><td><strong>{{ eer_pct }}</strong></td><td>Point d'équilibre FAR = FRR</td></tr>
+  <tr><td>AUC-ROC</td><td><strong>{{ auc }}</strong></td><td>Surface sous la courbe ROC (1.0 = parfait)</td></tr>
+</table>
+
+{% if suspicious_timecodes %}
+<h3>4.3 Zones temporelles suspectes</h3>
+<table>
+  <tr><th>Début</th><th>Fin</th><th>Composante</th><th>Score</th></tr>
+  {% for tc in suspicious_timecodes %}
+  <tr>
+    <td>{{ tc.start_s }}s</td>
+    <td>{{ tc.end_s }}s</td>
+    <td>{{ tc.component }}</td>
+    <td>{{ "%.0f"|format(tc.score * 100) }}%</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- §5 — EXPLICATION NON-TECHNICIENNE (XAI) -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h2><span class="section-num">§5</span> — Explication pour non-spécialistes</h2>
+<div class="plain-explanation">{{ plain_explanation }}</div>
+
+{% if shap_values %}
+<h3>5.1 Contribution de chaque indicateur au verdict</h3>
+<table>
+  <tr><th>Indicateur</th><th>Contribution au verdict</th><th>Score brut</th></tr>
+  {% for item in shap_values %}
+  <tr>
+    <td>{{ item.feature }}</td>
+    <td>{{ item.contribution }}%</td>
+    <td>{{ "%.1f"|format(item.raw_score * 100) }}%</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- §6 — LIMITES ET INCERTITUDES -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h2><span class="section-num">§6</span> — Limites et incertitudes</h2>
+<ul>
+  <li><strong>Compression vidéo :</strong> Une compression forte (H.264 CRF > 28) peut dégrader la détection des artefacts de texture.</li>
+  <li><strong>Adversarial deepfakes :</strong> Les deepfakes conçus spécifiquement pour contourner la détection (adversarial examples) peuvent réduire les performances.</li>
+  <li><strong>Domaine hors distribution :</strong> Les performances peuvent varier si le contenu diffère significativement des datasets d'entraînement.</li>
+  <li><strong>Audio de faible qualité :</strong> Un fort bruit de fond peut affecter la détection des artefacts vocaux.</li>
+  <li><strong>Taux d'erreur :</strong> FAR = {{ far_pct }} — FRR = {{ frr_pct }}. Ce résultat doit être corroboré par d'autres éléments de preuve.</li>
+</ul>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- §7 — CONCLUSION -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h2><span class="section-num">§7</span> — Conclusion et opinion d'expert</h2>
+<p>
+  Sur la base de l'analyse forensique effectuée par le système DeepfakeDetector v1.0.0,
+  et en tenant compte de la méthodologie décrite en §3 et des résultats présentés en §4,
+  l'expert soussigné est d'opinion que le fichier soumis (UUID : <code>{{ media_file.uuid }}</code>) est :
+</p>
+<div class="verdict-box" style="margin-top: 12px;">
+  <div class="verdict-label">{{ verdict_label }}</div>
+  <div class="verdict-score">Score de risque : {{ final_score_pct }} (IC 95% : {{ ic_low_pct }}–{{ ic_high_pct }})</div>
+</div>
+<div class="warning">
+  <strong>Avertissement légal :</strong> Ce rapport constitue une opinion d'expert fondée sur
+  une analyse algorithmique. Il ne remplace pas le jugement humain et doit être considéré en
+  conjonction avec d'autres éléments de preuve disponibles.
+</div>
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- §8 — SIGNATURE ET CERTIFICATION -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<h2><span class="section-num">§8</span> — Signature et certification</h2>
+<div class="signature-block">
+  <table>
+    <tr><td><strong>Rapport produit par</strong></td><td>DeepfakeDetector v1.0.0</td></tr>
+    <tr><td><strong>Expert signataire</strong></td><td>{{ expert.username }}</td></tr>
+    <tr><td><strong>Date et heure</strong></td><td>{{ generated_at }}</td></tr>
+    <tr><td><strong>Hash SHA-256 du rapport</strong></td><td class="hash-block" id="report-hash">Calculé après génération</td></tr>
+    <tr><td><strong>Algorithme de signature</strong></td><td>RSA-4096 + PSS + SHA-256</td></tr>
+    <tr><td><strong>Horodatage TSA (RFC 3161)</strong></td><td>{{ tsa_authority }}</td></tr>
+  </table>
+  <br>
+  <p><strong>Références légales applicables :</strong></p>
+  <ul style="font-size: 9pt; color: #37474f;">
+    <li>{{ lpc_reference }}</li>
+    <li>{{ mohan_reference }}</li>
+    <li>{{ jlj_reference }}</li>
+    <li>{{ dgsi_reference }}</li>
+    <li>ISO 19005-3 (PDF/A-3) — Archivage légal</li>
+    <li>RFC 3161 — Protocole d'horodatage certifié</li>
+  </ul>
+</div>
+
+<p style="text-align:center; font-size:8pt; color:#6c757d; margin-top:30px;">
+  Ce document est classifié CONFIDENTIEL. Toute reproduction non autorisée est interdite.<br>
+  Produit par DeepfakeDetector Canada — {{ generated_at }}
+</p>
+
+</body>
+</html>

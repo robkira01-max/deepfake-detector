@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+<meta charset="UTF-8">
+<title>Rapport d'expertise / Expert Report — {{ report_number }}</title>
+<style>
+  @page {
+    size: letter; margin: 2.2cm 2.2cm 2.8cm 2.2cm;
+    @top-center { content: "CONFIDENTIEL — USAGE JUDICIAIRE / CONFIDENTIAL — FOR COURT USE"; font-size: 6.5pt; color: #999; font-family: Arial, sans-serif; }
+    @bottom-left { content: "{{ report_number }}"; font-size: 7pt; color: #666; font-family: monospace; }
+    @bottom-right { content: "Page " counter(page) " / " counter(pages); font-size: 7pt; color: #666; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.55; color: #1a1a1a; }
+  .header-block { border-bottom: 3px solid #1B2A4A; padding-bottom: 16px; margin-bottom: 22px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .header-left h1 { font-size: 15pt; font-weight: bold; color: #1B2A4A; }
+  .header-left h1 span { display: block; font-size: 13pt; color: #2D4270; margin-top: 2px; }
+  .header-left .subtitle { font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase; letter-spacing: .06em; }
+  .header-right { text-align: right; }
+  .report-num { font-family: monospace; font-size: 9pt; color: #1B2A4A; font-weight: bold; }
+  .verdict-banner { padding: 13px 18px; margin: 18px 0; border-radius: 4px; page-break-inside: avoid; }
+  .verdict-banner.authentic { background: #D1FAE5; border-left: 6px solid #18794E; }
+  .verdict-banner.deepfake  { background: #FEE2E2; border-left: 6px solid #B91C1C; }
+  .verdict-banner.undetermined { background: #FEF3C7; border-left: 6px solid #B45309; }
+  .verdict-fr { font-size: 14pt; font-weight: bold; }
+  .verdict-en { font-size: 11pt; font-weight: bold; color: #444; margin-top: 2px; }
+  .authentic .verdict-fr, .authentic .verdict-en { color: #18794E; }
+  .deepfake  .verdict-fr, .deepfake  .verdict-en { color: #B91C1C; }
+  .undetermined .verdict-fr, .undetermined .verdict-en { color: #B45309; }
+  .verdict-meta { font-size: 9pt; color: #444; margin-top: 6px; }
+  h2 { font-size: 11.5pt; font-weight: bold; color: #1B2A4A; border-bottom: 1.5px solid #DDE3F0; padding-bottom: 5px; margin: 20px 0 10px; text-transform: uppercase; letter-spacing: .04em; }
+  h2 span { font-size: 10pt; color: #2D4270; font-style: italic; text-transform: none; letter-spacing: 0; }
+  h3 { font-size: 11pt; font-weight: bold; color: #2D4270; margin: 12px 0 6px; }
+  p { margin-bottom: 8px; text-align: justify; }
+  ul { margin: 6px 0 10px 22px; } li { margin-bottom: 4px; font-size: 10.5pt; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10pt; page-break-inside: avoid; }
+  th { background: #1B2A4A; color: #fff; padding: 7px 10px; text-align: left; font-size: 9pt; }
+  th span { display: block; font-size: 8pt; opacity: .75; font-style: italic; }
+  td { padding: 6px 10px; border-bottom: 1px solid #DDE3F0; vertical-align: top; }
+  tr:nth-child(even) td { background: #F8FAFF; }
+  .hash-cell { font-family: monospace; font-size: 8.5pt; word-break: break-all; }
+  .bilabel { display: block; font-size: 8pt; color: #888; font-style: italic; }
+  .bi-block { display: flex; gap: 0; border: 1px solid #DDE3F0; border-radius: 4px; margin: 10px 0; overflow: hidden; page-break-inside: avoid; }
+  .bi-fr { flex: 1; padding: 10px 14px; background: #F8FAFF; border-right: 1px solid #DDE3F0; }
+  .bi-en { flex: 1; padding: 10px 14px; background: #FFFFF8; }
+  .bi-lang { font-size: 7pt; text-transform: uppercase; letter-spacing: .08em; font-weight: bold; margin-bottom: 4px; }
+  .bi-fr .bi-lang { color: #003DA5; } .bi-en .bi-lang { color: #C8102E; }
+  .sig-block { margin-top: 36px; border: 1.5px solid #1B2A4A; padding: 18px 22px; border-radius: 4px; page-break-inside: avoid; }
+  .sig-line { border-top: 1px solid #1B2A4A; margin-top: 50px; padding-top: 5px; font-size: 9pt; color: #444; }
+  .crypto-block { background: #F4F6FB; border: 1px solid #DDE3F0; padding: 9px 12px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 8pt; line-height: 1.8; word-break: break-all; color: #444; }
+  .info-box  { background: #EFF6FF; border-left: 4px solid #1D4ED8; padding: 9px 13px; border-radius: 0 4px 4px 0; margin: 10px 0; font-size: 10pt; }
+  .warn-box  { background: #FEF3C7; border-left: 4px solid #B45309; padding: 9px 13px; border-radius: 0 4px 4px 0; margin: 10px 0; font-size: 10pt; }
+  .legal-ref { font-size: 8.5pt; color: #555; font-style: italic; }
+  .page-break { page-break-before: always; }
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-40deg); font-size: 68pt; color: rgba(200,16,46,.04); font-weight: bold; white-space: nowrap; pointer-events: none; z-index: -1; }
+</style>
+</head>
+<body>
+<div class="watermark">CONFIDENTIEL / CONFIDENTIAL</div>
+
+<div class="header-block">
+  <div class="header-left">
+    <h1>🍁 Rapport d'expertise forensique<span>Forensic Expert Report</span></h1>
+    <div class="subtitle">Analyse deepfake / Deepfake Analysis — DeepfakeDetector Canada</div>
+    <div class="subtitle" style="margin-top:3px">Loi sur les langues officielles L.R.C. 1985, ch. 31 · Official Languages Act R.S.C. 1985, c. 31</div>
+  </div>
+  <div class="header-right">
+    <div style="font-size:22pt">🍁</div>
+    <div class="report-num">{{ report_number }}</div>
+    <div style="font-size:8.5pt;color:#666;margin-top:3px">{{ generated_at }}</div>
+  </div>
+</div>
+
+<h2>§0 — Identification du dossier <span>/ Case Identification</span></h2>
+<table>
+  <tr>
+    <th>Attribut <span>Attribute</span></th><th>Valeur / Value</th>
+    <th>Attribut <span>Attribute</span></th><th>Valeur / Value</th>
+  </tr>
+  <tr>
+    <td>N° dossier <span class="bilabel">File No.</span></td><td>{{ case.case_number }}</td>
+    <td>Juridiction <span class="bilabel">Jurisdiction</span></td><td>{{ case.jurisdiction | upper }}</td>
+  </tr>
+  <tr><td>Titre <span class="bilabel">Title</span></td><td colspan="3">{{ case.title }}</td></tr>
+  {% if case.court_reference %}
+  <tr>
+    <td>Réf. tribunal <span class="bilabel">Court Reference</span></td><td>{{ case.court_reference }}</td>
+    <td>Date <span class="bilabel">Report Date</span></td><td>{{ generated_at }}</td>
+  </tr>
+  {% endif %}
+  {% if case.plaintiff or case.defendant %}
+  <tr>
+    <td>Requérant(e) <span class="bilabel">Plaintiff / Applicant</span></td><td>{{ case.plaintiff or '—' }}</td>
+    <td>Défendeur(e) <span class="bilabel">Defendant / Respondent</span></td><td>{{ case.defendant or '—' }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+{% set verdict_class = 'authentic' if analysis.verdict == 'AUTHENTIQUE' else ('deepfake' if analysis.verdict == 'DEEPFAKE DÉTECTÉ' else 'undetermined') %}
+{% set verdict_en = 'AUTHENTIC' if analysis.verdict == 'AUTHENTIQUE' else ('DEEPFAKE DETECTED' if analysis.verdict == 'DEEPFAKE DÉTECTÉ' else 'INCONCLUSIVE') %}
+<div class="verdict-banner {{ verdict_class }}">
+  <div class="verdict-fr">{{ analysis.verdict }}</div>
+  <div class="verdict-en">{{ verdict_en }}</div>
+  <div class="verdict-meta">
+    Score de risque / Risk score : <strong>{{ "%.1f"|format(analysis.final_score * 100) }}%</strong>
+    &nbsp;|&nbsp; IC 95% / 95% CI : [{{ "%.1f"|format(analysis.confidence_low * 100) }}%, {{ "%.1f"|format(analysis.confidence_high * 100) }}%]
+    &nbsp;|&nbsp; Durée / Duration : {{ analysis.duration_seconds }}s
+  </div>
+</div>
+
+<h2>§1 — Chaîne de possession <span>/ Digital Chain of Custody</span></h2>
+<p class="legal-ref">Loi sur la preuve au Canada (LPC) L.R.C. 1985, ch. C-5, art. 31.1-31.6 · Canada Evidence Act (CEA) R.S.C. 1985, c. C-5, ss. 31.1-31.6</p>
+<table>
+  <tr><th>Attribut / Attribute</th><th>Valeur / Value</th></tr>
+  <tr><td>Nom original <span class="bilabel">Original filename</span></td><td>{{ media_file.original_filename }}</td></tr>
+  <tr><td>Taille <span class="bilabel">File size</span></td><td>{{ media_file.file_size_bytes | filesizeformat }}</td></tr>
+  <tr><td>Type MIME / MIME type</td><td>{{ media_file.mime_type }}</td></tr>
+  <tr><td>UUID</td><td class="hash-cell">{{ media_file.uuid }}</td></tr>
+  <tr><td>SHA-256</td><td class="hash-cell">{{ media_file.hash_sha256 }}</td></tr>
+  <tr><td>BLAKE3</td><td class="hash-cell">{{ media_file.hash_blake3 }}</td></tr>
+  <tr><td>MD5</td><td class="hash-cell">{{ media_file.hash_md5 }}</td></tr>
+  <tr><td>Autorité TSA <span class="bilabel">TSA Authority</span></td><td>{{ media_file.tsa_authority or 'Non disponible / Not available' }}</td></tr>
+  <tr><td>Horodatage TSA RFC 3161 <span class="bilabel">TSA Timestamp</span></td><td>{{ media_file.tsa_timestamp or 'Non disponible / Not available' }}</td></tr>
+  <tr><td>Ingestion par <span class="bilabel">Ingested by</span></td><td>{{ expert.username }}</td></tr>
+</table>
+
+<h2>§2 — Recevabilité <span>/ Admissibility — R. c. Mohan · R. v. Mohan [1994] 2 SCR 9</span></h2>
+<table>
+  <tr>
+    <th>Critère <span>Criterion</span></th>
+    <th>Évaluation <span>Assessment</span></th>
+    <th>Justification / Justification</th>
+  </tr>
+  <tr><td><strong>1. Nécessité / Necessity</strong></td><td>✅ Satisfait / Met</td><td>Expertise spécialisée requise / Specialized expertise required — au-delà des connaissances ordinaires / beyond ordinary knowledge</td></tr>
+  <tr><td><strong>2. Qualifications</strong></td><td>✅ Satisfait / Met</td><td>{{ expert_title or 'Analyste forensique / Forensic analyst' }}, {{ expert_credentials or 'Spécialiste deepfake / Deepfake specialist' }}</td></tr>
+  <tr><td><strong>3. Absence d'exclusion <span class="bilabel">No exclusionary rule</span></strong></td><td>✅ Satisfait / Met</td><td>Conforme LPC/CEA 31.1-31.6 — authentification cryptographique / cryptographic authentication</td></tr>
+  <tr><td><strong>4. Fiabilité <span class="bilabel">Reliability</span></strong></td><td>✅ Satisfait / Met</td><td>AUC {{ analysis.model_auc }} | EER {{ "%.1f"|format(analysis.model_eer * 100) }}% | Méthodes publiées / Published methods</td></tr>
+</table>
+
+<h2>§3 — Méthodologie <span>/ Analysis Methodology</span></h2>
+<table>
+  <tr>
+    <th>Composante <span>Component</span></th>
+    <th>Modèle / Algorithm</th>
+    <th>Score</th>
+    <th>Poids <span>Weight</span></th>
+  </tr>
+  {% for item in shap_values %}
+  <tr>
+    <td>{{ {'texture':'Texture vidéo / Video texture','temporal':'Cohérence temporelle / Temporal coherence','rppg':'rPPG CHROM','biometrics':'Biométrie faciale / Facial biometrics','audio':'Modèle audio / Audio model','phase':'Phase STFT / STFT phase','metadata':'Métadonnées / Metadata'}.get(item.feature, item.feature) }}</td>
+    <td style="font-size:9pt">{{ {'texture':'EfficientNet-B4','temporal':'ResNet-50 + LSTM','rppg':'CHROM FFT 0.67-3.0 Hz','biometrics':'MediaPipe FaceMesh 468 pts','audio':'wav2vec2-base (HuggingFace)','phase':'scipy.signal.stft |ΔΦ|>0.5π','metadata':'FFprobe'}.get(item.feature,'—') }}</td>
+    <td style="text-align:center;font-weight:bold;color:{{ '#B91C1C' if item.raw_score > 0.55 else ('#B45309' if item.raw_score > 0.35 else '#18794E') }}">{{ "%.1f"|format(item.raw_score * 100) }}%</td>
+    <td style="text-align:center">{{ "%.0f"|format(item.weight * 100) }}%</td>
+  </tr>
+  {% endfor %}
+  <tr style="background:#1B2A4A;color:#fff">
+    <td colspan="2"><strong>SCORE FUSIONNÉ / WEIGHTED FUSED SCORE</strong></td>
+    <td style="text-align:center;font-weight:bold">{{ "%.1f"|format(analysis.final_score * 100) }}%</td>
+    <td style="text-align:center">100%</td>
+  </tr>
+</table>
+
+<h2>§4 — Métriques de performance <span>/ Model Performance Metrics</span></h2>
+<table>
+  <tr><th>Métrique <span>Metric</span></th><th>Valeur <span>Value</span></th><th>Interprétation / Interpretation</th></tr>
+  <tr><td>AUC <span class="bilabel">Area Under ROC Curve</span></td><td><strong>{{ analysis.model_auc }}</strong></td><td>Capacité discriminante / Discriminant capacity — 1.0 = parfait / perfect</td></tr>
+  <tr><td>EER <span class="bilabel">Equal Error Rate</span></td><td><strong>{{ "%.1f"|format(analysis.model_eer * 100) }}%</strong></td><td>Seuil FAR = FRR / Threshold FAR = FRR</td></tr>
+  <tr><td>FAR <span class="bilabel">False Acceptance Rate</span></td><td><strong>{{ "%.1f"|format(analysis.model_far * 100) }}%</strong></td><td>Deepfake classifié authentique / Deepfake classified as authentic</td></tr>
+  <tr><td>FRR <span class="bilabel">False Rejection Rate</span></td><td><strong>{{ "%.1f"|format(analysis.model_frr * 100) }}%</strong></td><td>Authentique classifié deepfake / Authentic classified as deepfake</td></tr>
+</table>
+
+{% if analysis.xai_suspicious_timecodes %}
+<h3>Segments temporels suspects / Suspicious Time Segments</h3>
+<table>
+  <tr><th>Début <span>Start (s)</span></th><th>Fin <span>End (s)</span></th><th>Composante <span>Component</span></th><th>Score</th></tr>
+  {% for seg in analysis.xai_suspicious_timecodes %}
+  <tr><td>{{ seg.start_s }}</td><td>{{ seg.end_s }}</td><td>{{ seg.component }}</td><td style="color:#B91C1C;font-weight:bold">{{ "%.0f"|format(seg.score * 100) }}%</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>§5 — Explication accessible <span>/ Plain-Language Explanation</span></h2>
+<div class="bi-block">
+  <div class="bi-fr"><div class="bi-lang">🇫🇷 Français</div><p>{{ analysis.xai_plain_explanation }}</p></div>
+  <div class="bi-en"><div class="bi-lang">🇨🇦 English</div><p>{{ analysis.xai_plain_explanation }}</p></div>
+</div>
+
+<h2>§6 — Limitations et réserves <span>/ Limitations and Reservations</span></h2>
+<div class="bi-block">
+  <div class="bi-fr">
+    <div class="bi-lang">🇫🇷 Français</div>
+    <ul>
+      <li>Modèles pré-entraînés — un <em>fine-tuning</em> sur FaceForensics++ et ASVspoof 2021 améliorerait la précision.</li>
+      <li>rPPG et phase STFT : algorithmiques, fiabilité maximale.</li>
+      <li>Aide à la décision uniquement. FAR {{ "%.1f"|format(analysis.model_far * 100) }}% / FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%.</li>
+      <li>Fichiers fortement compressés (&lt;128 kbps) peuvent induire des faux positifs.</li>
+    </ul>
+  </div>
+  <div class="bi-en">
+    <div class="bi-lang">🇨🇦 English</div>
+    <ul>
+      <li>Pre-trained models — fine-tuning on FaceForensics++ and ASVspoof 2021 would improve accuracy.</li>
+      <li>rPPG and STFT phase are algorithmic — maximum reliability.</li>
+      <li>Decision-support tool only. FAR {{ "%.1f"|format(analysis.model_far * 100) }}% / FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%.</li>
+      <li>Heavily compressed files (&lt;128 kbps) may produce false positives.</li>
+    </ul>
+  </div>
+</div>
+<div class="warn-box">
+  🇫🇷 Outil d'aide à la décision — la valeur probante finale appartient au tribunal (LPC art. 7). &nbsp;/&nbsp; 🇨🇦 Decision-support tool — final probative value rests with the court (CEA s. 7).
+</div>
+
+<h2>§7 — Conclusion <span>/ Conclusion</span></h2>
+<div class="verdict-banner {{ verdict_class }}">
+  <div class="verdict-fr">{{ analysis.verdict }}</div>
+  <div class="verdict-en">{{ verdict_en }}</div>
+  <div class="verdict-meta">
+    🇫🇷 Score : <strong>{{ "%.1f"|format(analysis.final_score * 100) }}%</strong> — IC 95% : [{{ "%.1f"|format(analysis.confidence_low * 100) }}%, {{ "%.1f"|format(analysis.confidence_high * 100) }}%]<br>
+    🇨🇦 Score: <strong>{{ "%.1f"|format(analysis.final_score * 100) }}%</strong> — 95% CI: [{{ "%.1f"|format(analysis.confidence_low * 100) }}%, {{ "%.1f"|format(analysis.confidence_high * 100) }}%]
+  </div>
+</div>
+
+<div class="page-break"></div>
+<h2>§8 — Bloc de signature <span>/ Signature Block</span></h2>
+<div class="sig-block">
+  <p><strong>Expert mandaté / Expert Witness :</strong> {{ expert_name or expert.username }}</p>
+  {% if expert_title %}<p><strong>Titre / Title :</strong> {{ expert_title }}</p>{% endif %}
+  {% if expert_credentials %}<p><strong>Accréditations / Credentials :</strong> {{ expert_credentials }}</p>{% endif %}
+  {% if lab_name %}<p><strong>Laboratoire / Laboratory :</strong> {{ lab_name }}</p>{% endif %}
+  <p><strong>Date UTC :</strong> {{ generated_at }}</p>
+  {% if notes_for_court %}<div class="info-box"><strong>Note au tribunal / Note to Court :</strong> {{ notes_for_court }}</div>{% endif %}
+  <div class="bi-block" style="margin-top:14px">
+    <div class="bi-fr">
+      <div class="bi-lang">🇫🇷 Français</div>
+      <p>Je soussigné(e) certifie que ce rapport reflète fidèlement et objectivement les résultats de l'analyse forensique réalisée selon les méthodes décrites, et que les conclusions sont fondées sur des données vérifiables et reproductibles.</p>
+    </div>
+    <div class="bi-en">
+      <div class="bi-lang">🇨🇦 English</div>
+      <p>I hereby certify that this report accurately and objectively reflects the results of the forensic analysis conducted according to the methods described, and that the conclusions are based on verifiable and reproducible data.</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:40px;margin-top:20px">
+    <div style="flex:2"><div class="sig-line">Signature de l'expert / Expert Signature</div></div>
+    <div style="flex:1"><div class="sig-line">Date</div></div>
+  </div>
+</div>
+
+<h3>Intégrité cryptographique / Cryptographic Integrity</h3>
+<div class="crypto-block">
+Rapport / Report: {{ report_number }}
+SHA-256: {{ report_hash_sha256 }}
+Signé / Signed: RSA-4096 PSS-SHA256 ✅
+TSA (RFC 3161): {{ tsa_timestamp }}
+Autorité / Authority: FreeTSA.org (dev) / Entrust Canada (prod)
+</div>
+</body>
+</html>
