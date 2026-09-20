@@ -182,6 +182,11 @@ def get_analysis(
     analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analyse introuvable")
+    # SEC-04 FIX: IDOR — vérifier que l'utilisateur a accès au case parent
+    if current_user.role != UserRole.admin:
+        case = db.query(Case).filter(Case.id == analysis.case_id).first()
+        if not case or case.created_by_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Accès refusé à cette analyse")
     return AnalysisResponse.model_validate(analysis)
 
 
@@ -195,6 +200,11 @@ def list_case_analyses(
     current_user: Annotated[User, Depends(require_any)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[AnalysisResponse]:
+    # SEC-04 FIX: IDOR — vérifier que l'utilisateur a accès au case
+    if current_user.role != UserRole.admin:
+        case = db.query(Case).filter(Case.id == case_id).first()
+        if not case or case.created_by_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Accès refusé à ce dossier")
     analyses = (
         db.query(Analysis)
         .filter(Analysis.case_id == case_id)

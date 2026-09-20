@@ -116,6 +116,7 @@ def login(
 
 
 @router.post("/mfa/verify", response_model=TokenResponse, summary="Vérification MFA TOTP")
+@_limiter.limit("5/minute")
 def verify_mfa(
     request: Request,
     body: MFAVerifyRequest,

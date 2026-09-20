@@ -1,0 +1,38 @@
+# Secrets — jamais en git
+.env
+.env.*
+!.env.example
+keys/
+*.pem
+*.key
+
+# Données sensibles
+data/deepfake.db
+data/uploads/
+data/quarantine/
+data/processed/
+dump.rdb
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Modèles ML (gros fichiers binaires)
+models/cache/
+*.bin
+*.safetensors
+*.pt
+*.pth
