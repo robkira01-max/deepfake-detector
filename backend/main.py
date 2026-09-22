@@ -16,7 +16,7 @@ from starlette.responses import Response
 
 from config import settings
 from database import init_db
-from routers import auth, cases, analyze, reports, templates as templates_router
+from routers import auth, cases, analyze, dashboard, reports, templates as templates_router
 
 log = structlog.get_logger(__name__)
 
@@ -138,6 +138,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(cases.router)
 app.include_router(analyze.router)
+app.include_router(dashboard.router)
 app.include_router(reports.router)
 app.include_router(templates_router.router)
 
