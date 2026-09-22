@@ -1,0 +1,88 @@
+# DeepfakeDetector Canada — Docker Compose Production Override
+# Usage : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Ce fichier surcharge docker-compose.yml pour la production :
+#   - DEBUG=false, pas de --reload
+#   - Workers augmentés (4 uvicorn + 4 celery)
+#   - Restart always
+#   - Ports DB/Redis non exposés (seulement via réseau interne Docker)
+#   - Ressources limitées
+
+services:
+
+  # ── API — Production ─────────────────────────────────────────────────────────
+  api:
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=warning
+    command: >
+      uvicorn main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 4
+      --log-level warning
+      --access-log
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ── Worker — Production ──────────────────────────────────────────────────────
+  worker:
+    command: >
+      celery -A tasks.analysis_tasks worker
+      --loglevel=warning
+      --concurrency=4
+      --max-tasks-per-child=100
+      --time-limit=600
+      --soft-time-limit=540
+      --without-gossip
+      --without-mingle
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "3.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+
+  # ── PostgreSQL — Ports non exposés en production ──────────────────────────────
+  postgres:
+    ports: []       # Supprime l'exposition localhost:5432 de la base
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ── Redis — Ports non exposés en production ───────────────────────────────────
+  redis:
+    ports: []       # Supprime l'exposition localhost:6379
+    restart: always
+
+  # ── MinIO — Console non exposée en production ─────────────────────────────────
+  minio:
+    ports:
+      - "127.0.0.1:9000:9000"   # API S3 seulement, pas de console
+    restart: always
+
+  # ── Nginx — TLS certs production depuis /etc/ssl/deepfake/ ───────────────────
+  nginx:
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/ssl/deepfake:/etc/nginx/ssl:ro    # Certs Let's Encrypt (prod)
+      - nginx_logs:/var/log/nginx
+    restart: always
+
+  # ── Flower — Désactivé en production (ou derrière auth stricte) ──────────────
+  flower:
+    ports: []       # Ne pas exposer Flower publiquement
+    restart: always
+    # Pour accès admin seulement : tunnel SSH ou VPN
