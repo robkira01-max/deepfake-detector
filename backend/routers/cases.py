@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -21,12 +21,36 @@ router = APIRouter(prefix="/cases", tags=["Dossiers"])
 # ── Schémas ───────────────────────────────────────────────────────────────────
 
 class CaseCreateRequest(BaseModel):
-    title: str
-    description: str | None = None
-    jurisdiction: Jurisdiction = Jurisdiction.federal
-    plaintiff: str | None = None
-    defendant: str | None = None
-    counsel: str | None = None
+    title: str = Field(
+        description="Titre du dossier judiciaire",
+        examples=["Affaire Dupont c. Société XYZ — Vidéo manipulée"],
+    )
+    description: str | None = Field(
+        default=None,
+        description="Description détaillée du contexte de l'affaire",
+        examples=["Vidéo de surveillance dont l'authenticité est contestée — Cour supérieure Québec"],
+    )
+    jurisdiction: Jurisdiction = Field(
+        default=Jurisdiction.federal,
+        description="Juridiction compétente : federal | ontario | quebec | bc | alberta | autre",
+        examples=["quebec"],
+    )
+    plaintiff: str | None = Field(default=None, examples=["Dupont, Jean-Pierre"])
+    defendant: str | None = Field(default=None, examples=["Société XYZ Inc."])
+    counsel: str | None = Field(default=None, examples=["Me. Marie Tremblay, 514-555-0123"])
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "title": "Affaire Dupont c. Société XYZ — Vidéo manipulée",
+                "description": "Vidéo de surveillance dont l'authenticité est contestée",
+                "jurisdiction": "quebec",
+                "plaintiff": "Dupont, Jean-Pierre",
+                "defendant": "Société XYZ Inc.",
+                "counsel": "Me. Marie Tremblay, 514-555-0123",
+            }
+        }
+    }
 
 
 class CaseResponse(BaseModel):
@@ -45,7 +69,27 @@ class CaseResponse(BaseModel):
     retain_until: datetime | None
     media_count: int = 0
 
-    model_config = {"from_attributes": True}
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "id": 7,
+                "case_number": "DFC-2026-QC-007",
+                "title": "Affaire Dupont c. Société XYZ — Vidéo manipulée",
+                "description": "Vidéo de surveillance dont l'authenticité est contestée",
+                "jurisdiction": "quebec",
+                "status": "open",
+                "plaintiff": "Dupont, Jean-Pierre",
+                "defendant": "Société XYZ Inc.",
+                "counsel": "Me. Marie Tremblay",
+                "created_by_id": 42,
+                "created_at": "2026-09-20T09:15:00Z",
+                "updated_at": "2026-09-20T09:15:00Z",
+                "retain_until": "2033-09-20T09:15:00Z",
+                "media_count": 2,
+            }
+        },
+    }
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

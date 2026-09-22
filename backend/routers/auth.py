@@ -79,17 +79,48 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     mfa_required: bool = False
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "token_type": "bearer",
+                "mfa_required": False,
+            }
+        }
+    }
+
 
 class MFAVerifyRequest(BaseModel):
-    totp_code: str
-    temp_token: str
+    totp_code: str = Field(
+        description="Code TOTP à 6 chiffres généré par l'application authenticator",
+        pattern=r"^\d{6}$",
+        examples=["123456"],
+    )
+    temp_token: str = Field(
+        description="Token temporaire reçu lors de la connexion quand mfa_required=true",
+    )
 
 
 class UserCreateRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
-    email: EmailStr
-    password: str = Field(min_length=12, description="Minimum 12 caractères")
-    role: UserRole = UserRole.readonly
+    username: str = Field(
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_-]+$",
+        examples=["expert_forensique"],
+        description="Identifiant unique (lettres, chiffres, tirets, underscores)",
+    )
+    email: EmailStr = Field(examples=["expert@tribunal.gc.ca"])
+    password: str = Field(
+        min_length=12,
+        description="Minimum 12 caractères : majuscule, minuscule, chiffre, caractère spécial",
+        examples=["Forensic@2026!Secure"],
+    )
+    role: UserRole = Field(
+        default=UserRole.readonly,
+        description="Rôle RBAC : admin | analyst | readonly",
+        examples=["analyst"],
+    )
 
     @field_validator("password")
     @classmethod
@@ -122,7 +153,21 @@ class UserResponse(BaseModel):
     created_at: datetime
     last_login: datetime | None
 
-    model_config = {"from_attributes": True}
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "id": 42,
+                "username": "expert_forensique",
+                "email": "expert@tribunal.gc.ca",
+                "role": "analyst",
+                "is_active": True,
+                "mfa_enabled": True,
+                "created_at": "2026-01-15T09:30:00Z",
+                "last_login": "2026-09-20T14:22:11Z",
+            }
+        },
+    }
 
 
 class MFASetupResponse(BaseModel):

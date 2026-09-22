@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -41,6 +41,28 @@ class StatsResponse(BaseModel):
     analyses_last_7_days: int
     generated_at: datetime
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "total_cases": 47,
+                "cases_by_status": {"open": 32, "closed": 12, "archived": 3},
+                "total_analyses": 89,
+                "analyses_by_verdict": {
+                    "DEEPFAKE DÉTECTÉ": 23,
+                    "AUTHENTIQUE": 58,
+                    "INDÉTERMINÉ": 8,
+                    "pending": 0,
+                },
+                "total_media_files": 112,
+                "total_reports": 67,
+                "deepfake_rate": 0.2584,
+                "avg_confidence": 0.8312,
+                "analyses_last_7_days": 14,
+                "generated_at": "2026-09-20T15:00:00Z",
+            }
+        }
+    }
+
 
 class AuditLogEntry(BaseModel):
     id: int
@@ -51,20 +73,50 @@ class AuditLogEntry(BaseModel):
     timestamp: datetime
     details: dict | None
 
-    model_config = {"from_attributes": True}
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "id": 1024,
+                "user_username": "expert_forensique",
+                "action": "ANALYSIS_STARTED",
+                "resource_type": "Analysis",
+                "resource_id": "89",
+                "timestamp": "2026-09-20T14:30:00Z",
+                "details": {"media_file_id": 112, "case_id": 47},
+            }
+        },
+    }
 
 
 class ComponentHealth(BaseModel):
-    status: str
+    status: str = Field(description="ok | degraded | unavailable | critical | missing")
     latency_ms: float | None = None
     detail: str | None = None
 
 
 class HealthDetailedResponse(BaseModel):
-    status: str  # ok | degraded | critical
+    status: str = Field(description="Statut global : ok | degraded | critical")
     components: dict[str, Any]
     version: str
     uptime_seconds: float
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "status": "ok",
+                "components": {
+                    "database": {"status": "ok", "latency_ms": 1.2},
+                    "redis": {"status": "ok", "latency_ms": 0.8},
+                    "celery": {"status": "ok", "workers": 2},
+                    "jwt_keys": {"status": "ok", "algorithm": "RS256"},
+                    "storage": {"status": "ok", "type": "local", "path": "/app/data/uploads"},
+                },
+                "version": "1.0.0",
+                "uptime_seconds": 3600.5,
+            }
+        }
+    }
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

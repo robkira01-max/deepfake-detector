@@ -102,16 +102,118 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+_OPENAPI_DESCRIPTION = """
+## DeepfakeDetector Canada — API Forensique
+
+Plateforme d'analyse forensique deepfake audio/vidéo pour le système judiciaire canadien.
+
+### Conformité légale
+- **LPC art. 31.1–31.6** — Authenticité et intégrité des documents électroniques
+- **R. c. Mohan [1994] 2 RCS 9** — Critères d'admissibilité des preuves d'expert
+- **CAN/DGSI 120** — Forensique numérique — Meilleures pratiques
+
+### Authentification
+Toutes les routes protégées requièrent un token JWT RS256 via header :
+```
+Authorization: Bearer <access_token>
+```
+Obtenir un token via `POST /auth/token`.
+
+### Rôles RBAC
+| Rôle | Accès |
+|------|-------|
+| `admin` | Toutes les routes + gestion utilisateurs + audit log |
+| `analyst` | Dossiers + analyses + rapports |
+| `readonly` | Lecture seule (dossiers, statistiques) |
+
+### Pipeline d'analyse
+1. **Créer un dossier** → `POST /cases/`
+2. **Téléverser un fichier média** → `POST /analyze/upload/{case_id}`
+3. **Lancer l'analyse** → `POST /analyze/start/{media_file_id}`
+4. **Suivre l'état** → `GET /analyze/{analysis_id}`
+5. **Générer le rapport** → `POST /reports/{case_id}/{analysis_id}`
+
+### Chaîne de possession
+Chaque fichier ingéré reçoit automatiquement :
+- Hash **Blake3 + SHA-256 + MD5** (triple vérification)
+- Horodatage **TSA RFC 3161** (FreeTSA.org)
+- Signature **RSA-4096** des entrées d'audit
+
+### Moteurs ML (7 composants)
+| Composant | Poids | Description |
+|-----------|-------|-------------|
+| Texture vidéo | 20% | EfficientNet-B4 — artefacts GAN/diffusion |
+| Temporel | 15% | ResNet-50+LSTM — incohérences inter-frames |
+| rPPG | 18% | Analyse pouls carotidien (ChromChrom) |
+| Biométrie | 10% | MediaPipe FaceMesh — landmarks faciaux |
+| Audio modèle | 20% | Wav2Vec2 — voix synthétique |
+| Phase audio | 10% | STFT — discontinuités de phase |
+| Métadonnées | 7% | Signatures outils deepfake (DeepFaceLab, etc.) |
+"""
+
+_OPENAPI_TAGS = [
+    {
+        "name": "Authentification",
+        "description": (
+            "Gestion des sessions JWT RS256, MFA TOTP, "
+            "enregistrement et gestion des utilisateurs."
+        ),
+    },
+    {
+        "name": "Dossiers",
+        "description": (
+            "Gestion des dossiers judiciaires (cases). "
+            "Un dossier regroupe les fichiers médias et analyses pour une affaire."
+        ),
+    },
+    {
+        "name": "Analyses",
+        "description": (
+            "Téléversement de fichiers médias, déclenchement d'analyses deepfake "
+            "asynchrones via Celery, et consultation des résultats."
+        ),
+    },
+    {
+        "name": "Tableau de bord",
+        "description": (
+            "Statistiques globales, journal d'audit paginé (admin), "
+            "et état de santé détaillé de l'infrastructure."
+        ),
+    },
+    {
+        "name": "Rapports",
+        "description": (
+            "Génération de rapports forensiques PDF signés RSA-4096 + TSA. "
+            "Conformes aux exigences de l'art. 31.1-31.6 LPC."
+        ),
+    },
+    {
+        "name": "Templates",
+        "description": (
+            "Gestion des templates Jinja2 HTML pour la génération de rapports. "
+            "4 templates intégrés : complet, exécutif, bilingue, affidavit Québec."
+        ),
+    },
+    {
+        "name": "Système",
+        "description": "Health check et informations de version.",
+    },
+]
+
 app = FastAPI(
     title="DeepfakeDetector Canada",
-    description=(
-        "Plateforme d'analyse forensique deepfake audio/vidéo — "
-        "conforme LPC art. 31.1-31.6, R. c. Mohan [1994] 2 RCS 9 "
-        "et CAN/DGSI 120."
-    ),
+    description=_OPENAPI_DESCRIPTION,
     version=settings.app_version,
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
+    openapi_tags=_OPENAPI_TAGS,
+    contact={
+        "name": "DeepfakeDetector Canada",
+        "email": "forensic@deepfake-detector.ca",
+    },
+    license_info={
+        "name": "Propriétaire — Usage judiciaire uniquement",
+    },
     lifespan=lifespan,
 )
 
