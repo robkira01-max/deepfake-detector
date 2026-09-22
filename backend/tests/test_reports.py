@@ -96,12 +96,14 @@ def _make_report(db: Session, case: Case, analysis: Analysis, user: User, pdf_ex
 class TestEncryption:
     def test_encrypt_decrypt_roundtrip_no_fernet(self):
         """Sans clé Fernet configurée, encrypt/decrypt sont des no-ops."""
-        from core.encryption import encrypt_secret, decrypt_secret
-        plaintext = "my_secret_totp_key"
-        encrypted = encrypt_secret(plaintext)
-        assert encrypted == plaintext
-        decrypted = decrypt_secret(encrypted)
-        assert decrypted == plaintext
+        import core.encryption as enc_module
+        with mock.patch.object(enc_module, "settings") as m:
+            m.fernet = None
+            plaintext = "my_secret_totp_key"
+            encrypted = enc_module.encrypt_secret(plaintext)
+            assert encrypted == plaintext
+            decrypted = enc_module.decrypt_secret(encrypted)
+            assert decrypted == plaintext
 
     def test_encrypt_decrypt_with_fernet(self):
         """Avec clé Fernet, les données sont chiffrées puis déchiffrées correctement."""
@@ -127,8 +129,10 @@ class TestEncryption:
             assert result == "not_encrypted_at_all"
 
     def test_encrypt_empty_string_no_fernet(self):
-        from core.encryption import encrypt_secret
-        assert encrypt_secret("") == ""
+        import core.encryption as enc_module
+        with mock.patch.object(enc_module, "settings") as m:
+            m.fernet = None
+            assert enc_module.encrypt_secret("") == ""
 
 
 # ── Tests token_blocklist ──────────────────────────────────────────────────────
