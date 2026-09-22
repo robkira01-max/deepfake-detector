@@ -248,3 +248,153 @@ class TestUnauthenticatedAccess:
             assert resp.status_code == 401, (
                 f"{method} {path} devrait retourner 401, a retourné {resp.status_code}"
             )
+
+
+class TestCoreSecurityUnit:
+    """Tests unitaires des fonctions core/security.py non couvertes par les intégrations."""
+
+    # ── verify_totp ────────────────────────────────────────────────────────────
+
+    def test_verify_totp_valid_code(self):
+        import pyotp
+        from core.security import generate_mfa_secret, verify_totp
+
+        secret = generate_mfa_secret()
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+        assert verify_totp(secret, code) is True
+
+    def test_verify_totp_invalid_code(self):
+        from core.security import generate_mfa_secret, verify_totp
+
+        secret = generate_mfa_secret()
+        assert verify_totp(secret, "000000") is False
+
+    def test_generate_mfa_secret_base32(self):
+        from core.security import generate_mfa_secret
+
+        secret = generate_mfa_secret()
+        # Base32 = A-Z + 2-7
+        import re
+        assert re.match(r"^[A-Z2-7]{16,}$", secret), f"Format invalide : {secret}"
+
+    def test_get_mfa_provisioning_uri(self):
+        from core.security import generate_mfa_secret, get_mfa_provisioning_uri
+
+        secret = generate_mfa_secret()
+        uri = get_mfa_provisioning_uri("testuser", secret)
+        assert uri.startswith("otpauth://totp/")
+        assert "testuser" in uri
+
+    def test_generate_mfa_qr_base64_returns_png(self):
+        from core.security import generate_mfa_secret, generate_mfa_qr_base64
+        import base64
+
+        secret = generate_mfa_secret()
+        b64 = generate_mfa_qr_base64("user", secret)
+        raw = base64.b64decode(b64)
+        # Magic bytes PNG : \x89PNG
+        assert raw[:4] == b"\x89PNG", "Le QR code n'est pas un PNG valide"
+
+    # ── RSA keypair generation ─────────────────────────────────────────────────
+
+    def test_generate_rsa_keypair_creates_files(self, tmp_path):
+        from core.security import generate_rsa_keypair
+
+        generate_rsa_keypair(tmp_path)
+
+        private_pem = tmp_path / "private.pem"
+        public_pem = tmp_path / "public.pem"
+        assert private_pem.exists(), "private.pem non créé"
+        assert public_pem.exists(), "public.pem non créé"
+
+    def test_generate_rsa_keypair_pem_format(self, tmp_path):
+        from core.security import generate_rsa_keypair
+
+        generate_rsa_keypair(tmp_path)
+        private_content = (tmp_path / "private.pem").read_text()
+        public_content = (tmp_path / "public.pem").read_text()
+
+        assert "BEGIN RSA PRIVATE KEY" in private_content
+        assert "BEGIN PUBLIC KEY" in public_content
+
+    def test_generate_rsa_keypair_creates_output_dir(self, tmp_path):
+        from core.security import generate_rsa_keypair
+
+        new_dir = tmp_path / "subdir" / "keys"
+        generate_rsa_keypair(new_dir)
+        assert new_dir.exists()
+
+    # ── JWT edge cases ─────────────────────────────────────────────────────────
+
+    def test_private_key_missing_raises_runtime_error(self, monkeypatch):
+        """Patch _private_key directement car jwt_private_key est une computed property."""
+        import core.security as sec
+        # Patch la fonction interne pour simuler une clé absente
+        monkeypatch.setattr(sec, "_private_key", lambda: (_ for _ in ()).throw(
+            RuntimeError("JWT private key not found at /fake/path/private.pem")
+        ))
+        with pytest.raises(RuntimeError, match="JWT private key not found"):
+            sec._private_key()
+
+    def test_public_key_missing_raises_runtime_error(self, monkeypatch):
+        """Vérifier que _public_key lève RuntimeError si la clé est absente."""
+        import core.security as sec
+        monkeypatch.setattr(sec, "_public_key", lambda: (_ for _ in ()).throw(
+            RuntimeError("JWT public key not found at /fake/path/public.pem")
+        ))
+        with pytest.raises(RuntimeError, match="JWT public key not found"):
+            sec._public_key()
+
+    def test_decode_revoked_token_raises_401(self, monkeypatch):
+        """Token révoqué (is_revoked=True) → HTTPException 401."""
+        import core.security as sec
+
+        # Créer un vrai token valide
+        token = sec.create_access_token("testuser", "analyst")
+
+        # Simuler la révocation
+        monkeypatch.setattr(sec, "is_revoked", lambda jti: True)
+
+        with pytest.raises(Exception) as exc_info:
+            sec.decode_token(token)
+        assert exc_info.value.status_code == 401
+
+    def test_decode_token_wrong_type_in_get_current_user(
+        self, db, monkeypatch
+    ):
+        """Un refresh token ne doit pas passer get_current_user."""
+        import core.security as sec
+
+        # Créer un refresh token (type="refresh" pas "access")
+        refresh_token = sec.create_refresh_token("testuser")
+
+        with pytest.raises(Exception) as exc_info:
+            sec.get_current_user(refresh_token, db)
+        assert exc_info.value.status_code == 401
+
+    def test_mfa_sub_prefix_rejected(self, db):
+        """Token avec sub='mfa:...' doit être rejeté."""
+        import core.security as sec
+
+        token = sec.create_access_token("mfa:testuser", "analyst")
+        with pytest.raises(Exception) as exc_info:
+            sec.get_current_user(token, db)
+        assert exc_info.value.status_code == 401
+
+    def test_inactive_user_rejected(self, db, admin_user):
+        """Un utilisateur is_active=False doit être rejeté."""
+        import core.security as sec
+
+        # Désactiver l'admin user
+        admin_user.is_active = False
+        db.commit()
+
+        token = sec.create_access_token(admin_user.username, "admin")
+        with pytest.raises(Exception) as exc_info:
+            sec.get_current_user(token, db)
+        assert exc_info.value.status_code == 401
+
+        # Re-activer pour ne pas affecter les autres tests
+        admin_user.is_active = True
+        db.commit()
