@@ -1,7 +1,10 @@
 """Routes d'authentification — JWT RS256 + MFA TOTP + RBAC."""
 from __future__ import annotations
 
+import time
+from collections import defaultdict
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -12,6 +15,39 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 _limiter = Limiter(key_func=get_remote_address)
+
+# ── Lockout par username (thread-safe, in-process) ───────────────────────────
+_MAX_ATTEMPTS = 5       # échecs avant verrouillage
+_LOCKOUT_SECONDS = 300  # 5 minutes
+_WINDOW_SECONDS = 60    # fenêtre de comptage
+
+_login_failures: dict[str, list[float]] = defaultdict(list)
+_lock = Lock()
+
+
+def _check_lockout(username: str) -> None:
+    """Lève 429 si le compte est temporairement verrouillé."""
+    now = time.monotonic()
+    with _lock:
+        attempts = [t for t in _login_failures[username] if now - t < _LOCKOUT_SECONDS]
+        _login_failures[username] = attempts
+        if len(attempts) >= _MAX_ATTEMPTS:
+            retry_after = int(_LOCKOUT_SECONDS - (now - attempts[0]))
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Compte temporairement verrouillé. Réessayez dans {retry_after}s.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+
+def _record_failure(username: str) -> None:
+    with _lock:
+        _login_failures[username].append(time.monotonic())
+
+
+def _clear_failures(username: str) -> None:
+    with _lock:
+        _login_failures.pop(username, None)
 
 from core.security import (
     create_access_token,
@@ -108,11 +144,16 @@ def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:
-    user = db.query(User).filter(User.username == form_data.username).first()
+    username = form_data.username
     ip = request.client.host if request.client else ""
 
+    _check_lockout(username)
+
+    user = db.query(User).filter(User.username == username).first()
+
     if not user or not verify_password(form_data.password, user.hashed_password):
-        _audit(db, None, AuditAction.LOGIN_FAILED, ip=ip, details={"username": form_data.username})
+        _record_failure(username)
+        _audit(db, None, AuditAction.LOGIN_FAILED, ip=ip, details={"username": username})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identifiant ou mot de passe incorrect",
@@ -128,6 +169,7 @@ def login(
         return TokenResponse(access_token=temp_token, refresh_token="", mfa_required=True)
 
     # Login complet sans MFA
+    _clear_failures(user.username)
     _complete_login(db, user, ip)
     return TokenResponse(
         access_token=create_access_token(user.username, user.role.value),
@@ -152,12 +194,13 @@ def verify_mfa(
     if not user or not user.mfa_secret:
         raise HTTPException(status_code=401, detail="Utilisateur introuvable")
 
+    ip = request.client.host if request.client else ""
     if not verify_totp(decrypt_secret(user.mfa_secret), body.totp_code):
-        ip = request.client.host if request.client else ""
+        _record_failure(username)
         _audit(db, user, AuditAction.LOGIN_FAILED, ip=ip, details={"reason": "invalid_totp"})
         raise HTTPException(status_code=401, detail="Code MFA invalide")
 
-    ip = request.client.host if request.client else ""
+    _clear_failures(username)
     _complete_login(db, user, ip)
     _audit(db, user, AuditAction.MFA_VERIFIED, ip=ip)
 

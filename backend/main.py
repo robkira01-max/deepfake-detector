@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from config import settings
 from database import init_db
@@ -74,6 +76,32 @@ def _generate_audit_key(audit_key_path: "Path") -> None:
     log.info("audit_signing_key_generated", path=str(audit_key_path))
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Injecte les headers de sécurité sur toutes les réponses."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "0"  # Désactivé — CSP est la défense moderne
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=()"
+        )
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'none';"
+        )
+        if not settings.debug:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=63072000; includeSubDomains; preload"
+            )
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+
 app = FastAPI(
     title="DeepfakeDetector Canada",
     description=(
@@ -95,6 +123,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Host header protection — whitelist explicite en production
 if not settings.debug:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

@@ -277,7 +277,8 @@ class MetadataEngine:
 
                 if nb_frames and duration:
                     try:
-                        fps_declared = eval(r_frame_rate) if r_frame_rate else 0
+                        import ast
+                        fps_declared = ast.literal_eval(r_frame_rate) if r_frame_rate else 0
                         fps_actual = int(nb_frames) / float(duration)
                         if fps_declared > 0 and abs(fps_actual - fps_declared) / fps_declared > 0.1:
                             findings.append({

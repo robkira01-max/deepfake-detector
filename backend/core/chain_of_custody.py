@@ -53,7 +53,7 @@ def compute_hashes(file_path: Path) -> HashBundle:
     """Calcule SHA-256, BLAKE3 et MD5 en un seul passage sur le fichier."""
     h_sha256 = hashlib.sha256()
     h_blake3 = _blake3.blake3()
-    h_md5 = hashlib.md5()
+    h_md5 = hashlib.md5(usedforsecurity=False)  # nosec B324 — MD5 pour interopérabilité légale uniquement, pas pour sécurité
     total = 0
 
     with file_path.open("rb") as fh:

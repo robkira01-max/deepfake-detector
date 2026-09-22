@@ -67,11 +67,16 @@ class AudioEngine:
     def _load_models(self) -> None:
         try:
             from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
+            _WAV2VEC2_REVISION = "11ec5dcf8c10f0a6b7f94cfe88c17b5df6f9df80"  # main@2024-01
             self._feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
-                "facebook/wav2vec2-base", cache_dir="/home/kali/deepfake_detector/models/cache"
+                "facebook/wav2vec2-base",
+                revision=_WAV2VEC2_REVISION,
+                cache_dir="/home/kali/deepfake_detector/models/cache",
             )
             self._wav2vec2 = Wav2Vec2Model.from_pretrained(
-                "facebook/wav2vec2-base", cache_dir="/home/kali/deepfake_detector/models/cache"
+                "facebook/wav2vec2-base",
+                revision=_WAV2VEC2_REVISION,
+                cache_dir="/home/kali/deepfake_detector/models/cache",
             )
             self._wav2vec2.eval()
             self._wav2vec2.to(self._device)
