@@ -56,6 +56,7 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
     from models.media_file import MediaFile, MediaType
     from engines.video_engine import VideoEngine
     from engines.audio_engine import AudioEngine
+    from engines.metadata_engine import MetadataEngine
     from engines.fusion import fuse_scores
     from models.audit_log import AuditLog, AuditAction
     from core.chain_of_custody import sign_audit_entry
@@ -90,6 +91,12 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
             engine = AudioEngine()
             audio_scores = engine.analyze(file_path)
 
+        # ── Analyse métadonnées ───────────────────────────────────────────────
+        logger.info("Lancement MetadataEngine")
+        metadata_engine = MetadataEngine()
+        metadata_result = metadata_engine.analyze(file_path)
+        score_metadata = metadata_result.score if metadata_result.error is None else 0.0
+
         # ── Fusion ────────────────────────────────────────────────────────────
         result = fuse_scores(
             score_texture=video_scores.score_texture if video_scores else 0.0,
@@ -98,7 +105,7 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
             score_biometrics=video_scores.score_biometrics if video_scores else 0.0,
             score_audio=audio_scores.score_model if audio_scores else 0.0,
             score_phase=audio_scores.score_phase if audio_scores else 0.0,
-            score_metadata=0.0,
+            score_metadata=score_metadata,
         )
 
         # ── Mise à jour Analysis ───────────────────────────────────────────────

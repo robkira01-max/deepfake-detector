@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
@@ -50,10 +50,30 @@ class MFAVerifyRequest(BaseModel):
 
 
 class UserCreateRequest(BaseModel):
-    username: str
+    username: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
     email: EmailStr
-    password: str
+    password: str = Field(min_length=12, description="Minimum 12 caractères")
     role: UserRole = UserRole.readonly
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        """Validation politique de mots de passe : 12+ chars, maj, min, chiffre, spécial."""
+        import re
+        errors = []
+        if len(v) < 12:
+            errors.append("12 caractères minimum")
+        if not re.search(r"[A-Z]", v):
+            errors.append("au moins une majuscule")
+        if not re.search(r"[a-z]", v):
+            errors.append("au moins une minuscule")
+        if not re.search(r"\d", v):
+            errors.append("au moins un chiffre")
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", v):
+            errors.append("au moins un caractère spécial")
+        if errors:
+            raise ValueError("Mot de passe insuffisant : " + ", ".join(errors))
+        return v
 
 
 class UserResponse(BaseModel):
