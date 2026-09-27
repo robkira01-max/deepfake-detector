@@ -36,3 +36,23 @@ models/cache/
 *.safetensors
 *.pt
 *.pth
+
+# Ruflo / agents
+.agents/
+.claude/
+skills-lock.json
+backend/.agents/
+backend/.claude/
+backend/skills-lock.json
+
+# Coverage
+.coverage
+backend/.coverage
+htmlcov/
+
+# Data (datasets, modèles entraînés)
+data/datasets/
+data/metrics/
+data/models/
+data/protocols/
+training/

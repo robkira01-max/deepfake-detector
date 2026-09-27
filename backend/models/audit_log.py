@@ -1,4 +1,4 @@
-"""Journal d'audit immuable — conforme LPC 31.3 et CAN/DGSI 120."""
+"""Journal d'audit immuable — conçu pour soutenir l'admissibilité en preuve (LPC 31.3 | CAN/DGSI 120 [À VALIDER])."""
 import enum
 from datetime import datetime, timezone
 from sqlalchemy import String, Text, DateTime, Enum as SAEnum, ForeignKey, JSON, event
@@ -37,6 +37,25 @@ class AuditAction(str, enum.Enum):
     TSA_STAMPED = "TSA_STAMPED"
     INTEGRITY_VERIFIED = "INTEGRITY_VERIFIED"
     INTEGRITY_FAILED = "INTEGRITY_FAILED"
+    # Documents & feedback (v2.0)
+    DOCUMENT_ANALYSIS_STARTED = "DOCUMENT_ANALYSIS_STARTED"
+    DOCUMENT_ANALYSIS_COMPLETED = "DOCUMENT_ANALYSIS_COMPLETED"
+    DOCUMENT_ANALYSIS_FAILED = "DOCUMENT_ANALYSIS_FAILED"
+    FEEDBACK_SUBMITTED = "FEEDBACK_SUBMITTED"
+    # Model Registry (v3.0)
+    MODEL_REGISTERED = "MODEL_REGISTERED"
+    MODEL_PULLED = "MODEL_PULLED"
+    MODEL_ACTIVATED = "MODEL_ACTIVATED"
+    # Active Learning (v3.0)
+    RETRAIN_TRIGGERED = "RETRAIN_TRIGGERED"
+    # KYC (v3.1)
+    KYC_VERIFIED = "KYC_VERIFIED"
+    # Protocoles d'entraînement (Brief v3 §0)
+    PROTOCOL_CREATED  = "PROTOCOL_CREATED"
+    PROTOCOL_FROZEN   = "PROTOCOL_FROZEN"
+    PROTOCOL_CONSUMED = "PROTOCOL_CONSUMED"
+    # Statut de validation des engines (Brief v3 §6)
+    ENGINE_STATUS_CHANGED = "ENGINE_STATUS_CHANGED"
 
 
 class AuditLog(Base):

@@ -184,6 +184,7 @@
   Ces métriques permettent au tribunal d'évaluer le risque d'erreur du système,
   conformément à R. c. J.-L.J. [2000] 2 RCS 600 (fiabilité de la méthode scientifique).
 </p>
+{% if auc %}
 <table>
   <tr><th>Métrique</th><th>Valeur</th><th>Définition</th></tr>
   <tr><td>FAR (Taux de fausse acceptation)</td><td><strong>{{ far_pct }}</strong></td><td>Deepfake accepté comme authentique</td></tr>
@@ -191,6 +192,12 @@
   <tr><td>EER (Equal Error Rate)</td><td><strong>{{ eer_pct }}</strong></td><td>Point d'équilibre FAR = FRR</td></tr>
   <tr><td>AUC-ROC</td><td><strong>{{ auc }}</strong></td><td>Surface sous la courbe ROC (1.0 = parfait)</td></tr>
 </table>
+{% else %}
+<div class="warning">
+  <strong>Métriques non évaluées :</strong> Les indicateurs de performance (FAR/FRR/EER/AUC) n'ont pas encore été mesurés
+  sur un jeu de test indépendant. Validation indépendante requise avant usage en contexte judiciaire.
+</div>
+{% endif %}
 
 {% if suspicious_timecodes %}
 <h3>4.3 Zones temporelles suspectes</h3>
@@ -238,7 +245,7 @@
   <li><strong>Adversarial deepfakes :</strong> Les deepfakes conçus spécifiquement pour contourner la détection (adversarial examples) peuvent réduire les performances.</li>
   <li><strong>Domaine hors distribution :</strong> Les performances peuvent varier si le contenu diffère significativement des datasets d'entraînement.</li>
   <li><strong>Audio de faible qualité :</strong> Un fort bruit de fond peut affecter la détection des artefacts vocaux.</li>
-  <li><strong>Taux d'erreur :</strong> FAR = {{ far_pct }} — FRR = {{ frr_pct }}. Ce résultat doit être corroboré par d'autres éléments de preuve.</li>
+  <li><strong>Taux d'erreur :</strong> {% if far_pct %}FAR = {{ far_pct }} — FRR = {{ frr_pct }}.{% else %}Métriques non évaluées — validation indépendante requise.{% endif %} Ce résultat doit être corroboré par d'autres éléments de preuve.</li>
 </ul>
 
 <!-- ══════════════════════════════════════════════════════════════════════════ -->

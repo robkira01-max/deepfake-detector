@@ -48,5 +48,9 @@ def is_revoked(jti: str) -> bool:
     try:
         return r.exists(f"blocklist:{jti}") > 0
     except Exception as exc:
-        logger.warning("Failed to check revocation for jti=%s: %s", jti, exc)
-        return False
+        logger.warning("Transient Redis error checking jti=%s — failing secure: %s", jti, exc)
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service de vérification de token temporairement indisponible",
+        )

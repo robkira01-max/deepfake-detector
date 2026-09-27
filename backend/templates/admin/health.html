@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+{% block title %}Santé système{% endblock %}
+{% block page_title %}Santé de l'infrastructure{% endblock %}
+
+{% block content %}
+<!-- Global status -->
+<div class="card mb-4"
+     style="border-left: 4px solid {% if health.status == 'ok' %}var(--success){% elif health.status == 'degraded' %}var(--warning){% else %}var(--danger){% endif %}">
+  <div class="flex-between">
+    <div>
+      <div class="stat-label">Statut global</div>
+      <div class="stat-value" style="font-size:22px; color:
+        {% if health.status == 'ok' %}var(--success){% elif health.status == 'degraded' %}var(--warning){% else %}var(--danger){% endif %}">
+        {% if health.status == 'ok' %}&#10003; OPÉRATIONNEL
+        {% elif health.status == 'degraded' %}&#9888; DÉGRADÉ
+        {% else %}&#10007; CRITIQUE{% endif %}
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="stat-label">Version</div>
+      <div style="font-size:18px; font-weight:700; font-family:monospace">{{ health.version }}</div>
+      <div class="text-sm text-muted">Uptime : {{ "%.0f"|format(health.uptime_seconds // 3600) }}h {{ "%.0f"|format((health.uptime_seconds % 3600) // 60) }}m</div>
+    </div>
+  </div>
+</div>
+
+<!-- Components grid -->
+<div class="health-grid">
+  {% for name, info in health.components.items() %}
+  {% set status = info.get('status', 'unknown') %}
+  <div class="health-card {{ status }}">
+    <div class="health-name">{{ name }}</div>
+    <div class="health-status {{ status }}">
+      {% if status == 'ok' %}&#10003; OK
+      {% elif status == 'degraded' %}&#9888; Dégradé
+      {% elif status == 'unavailable' %}&#10007; Indisponible
+      {% elif status == 'critical' %}&#10007; Critique
+      {% elif status == 'missing' %}&#9888; Manquant
+      {% else %}? {{ status }}{% endif %}
+    </div>
+
+    {% if info.get('latency_ms') is not none %}
+    <div class="health-detail">Latence : {{ info.latency_ms }} ms</div>
+    {% endif %}
+    {% if info.get('workers') is not none %}
+    <div class="health-detail">Workers : {{ info.workers }}</div>
+    {% endif %}
+    {% if info.get('algorithm') %}
+    <div class="health-detail">Algorithme : {{ info.algorithm }}</div>
+    {% endif %}
+    {% if info.get('type') %}
+    <div class="health-detail">Type : {{ info.type }}</div>
+    {% endif %}
+    {% if info.get('path') %}
+    <div class="health-detail mono" style="font-size:11px; word-break:break-all">{{ info.path }}</div>
+    {% endif %}
+    {% if info.get('detail') %}
+    <div class="health-detail" style="color:var(--danger)">{{ info.detail | truncate(60) }}</div>
+    {% endif %}
+    {% if info.get('missing') %}
+    <div class="health-detail" style="color:var(--danger)">Manquant : {{ info.missing | join(', ') }}</div>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="text-muted">Aucun composant reporté.</p>
+  {% endfor %}
+</div>
+
+<div class="mt-4 text-sm text-muted">
+  Dernière vérification : {{ now.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+  &nbsp;&middot;&nbsp;
+  <a href="/admin/health">Rafraîchir</a>
+</div>
+{% endblock %}

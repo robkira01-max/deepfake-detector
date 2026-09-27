@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin{% endblock %} — DeepfakeDetector Canada</title>
+  <link rel="stylesheet" href="/admin/static/style.css">
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h1>DeepfakeDetector</h1>
+      <p>Administration</p>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-section">Tableau de bord</div>
+      <a href="/admin/dashboard" class="nav-item {% if active == 'dashboard' %}active{% endif %}">
+        <span class="icon">&#9636;</span> Vue d'ensemble
+      </a>
+      <a href="/admin/health" class="nav-item {% if active == 'health' %}active{% endif %}">
+        <span class="icon">&#9675;</span> Santé système
+      </a>
+
+      <div class="nav-section" style="margin-top:12px">Données</div>
+      <a href="/admin/cases" class="nav-item {% if active == 'cases' %}active{% endif %}">
+        <span class="icon">&#9636;</span> Dossiers
+      </a>
+      <a href="/admin/audit" class="nav-item {% if active == 'audit' %}active{% endif %}">
+        <span class="icon">&#9636;</span> Journal d'audit
+      </a>
+
+      <div class="nav-section" style="margin-top:12px">Gestion</div>
+      <a href="/admin/users" class="nav-item {% if active == 'users' %}active{% endif %}">
+        <span class="icon">&#9675;</span> Utilisateurs
+      </a>
+
+      <div class="nav-section" style="margin-top:12px">API</div>
+      <a href="/docs" target="_blank" class="nav-item">
+        <span class="icon">&#9636;</span> OpenAPI / Swagger
+      </a>
+      <a href="/redoc" target="_blank" class="nav-item">
+        <span class="icon">&#9636;</span> ReDoc
+      </a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">{{ current_user.username[0].upper() if current_user else '?' }}</div>
+        <div>
+          <div style="color:#e2e8f0; font-size:13px; font-weight:500">{{ current_user.username if current_user else '' }}</div>
+          <div style="font-size:11px">
+            <span class="badge badge-info" style="font-size:10px">{{ current_user.role.value if current_user else '' }}</span>
+          </div>
+        </div>
+      </div>
+      <form action="/admin/logout" method="post" style="margin:0">
+        <button type="submit" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center; color:#94a3b8; border-color:#334155">
+          Déconnexion
+        </button>
+      </form>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+      <div class="topbar-actions">
+        {% if flash %}
+          <span class="alert alert-{{ flash.type }}" style="margin:0; padding:6px 12px; font-size:12px">
+            {{ flash.message }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

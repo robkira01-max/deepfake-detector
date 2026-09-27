@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+<meta charset="UTF-8">
+<title>Rapport judiciaire — {{ report_number }}</title>
+<style>
+  @page {
+    size: letter; margin: 2.5cm 2.5cm 3cm 2.5cm;
+    @top-center { content: "RAPPORT FORENSIQUE — USAGE JUDICIAIRE EXCLUSIF / FOR COURT USE ONLY"; font-size: 6.5pt; color: #999; font-family: Arial, sans-serif; letter-spacing: .05em; }
+    @bottom-left { content: "{{ report_number }}"; font-size: 7pt; color: #666; font-family: monospace; }
+    @bottom-center { content: "CONFIDENTIEL — PIÈCE À CONVICTION / EXHIBIT"; font-size: 6.5pt; color: #999; letter-spacing:.04em; }
+    @bottom-right { content: "Page " counter(page) " sur / of " counter(pages); font-size: 7pt; color: #666; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.6; color: #1a1a1a; }
+
+  .header { background: #1B2A4A; color: #fff; padding: 20px 24px; margin-bottom: 20px; }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .header h1 { font-size: 14pt; font-weight: bold; }
+  .header h1 span { display: block; font-size: 11pt; color: #AABFE0; margin-top: 3px; }
+  .header .rnum { font-family: monospace; font-size: 9pt; color: #CCDDFF; text-align: right; }
+  .header .sub { font-size: 8pt; opacity: .75; margin-top: 6px; }
+
+  .section { margin: 16px 0; page-break-inside: avoid; }
+  .section-title { font-size: 9pt; font-weight: bold; text-transform: uppercase; letter-spacing: .06em; color: #1B2A4A; border-bottom: 2px solid #1B2A4A; padding-bottom: 4px; margin-bottom: 12px; }
+  .section-title span { font-style: italic; text-transform: none; font-size: 8.5pt; color: #2D4270; font-weight: normal; }
+
+  /* Verdict judiciaire */
+  .verdict-judicial { padding: 18px 22px; border-radius: 4px; margin: 16px 0; page-break-inside: avoid; }
+  .verdict-judicial.authentic { background: #D1FAE5; border-left: 6px solid #18794E; }
+  .verdict-judicial.deepfake  { background: #FEE2E2; border-left: 6px solid #B91C1C; }
+  .verdict-judicial.undetermined { background: #FEF3C7; border-left: 6px solid #B45309; }
+  .verdict-label { font-size: 13pt; font-weight: bold; margin-bottom: 6px; }
+  .authentic  .verdict-label { color: #18794E; }
+  .deepfake   .verdict-label { color: #B91C1C; }
+  .undetermined .verdict-label { color: #B45309; }
+  .verdict-sub { font-size: 9.5pt; color: #444; font-style: italic; margin-top: 3px; }
+  .verdict-score { font-size: 9pt; margin-top: 8px; color: #555; }
+
+  /* Fiabilité */
+  .reliability-box { display: flex; gap: 14px; margin: 14px 0; }
+  .rel-stat { flex: 1; border: 1.5px solid #DDE3F0; border-radius: 4px; padding: 12px 14px; text-align: center; }
+  .rel-stat .big { font-size: 20pt; font-weight: bold; color: #1B2A4A; }
+  .rel-stat .lbl { font-size: 8pt; color: #666; margin-top: 3px; line-height: 1.3; }
+
+  /* Indicateurs */
+  .indicator-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  .indicator-table th { background: #F0F4F9; color: #1B2A4A; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; padding: 7px 10px; border: 1px solid #DDE3F0; text-align: left; }
+  .indicator-table td { padding: 8px 10px; border: 1px solid #DDE3F0; vertical-align: middle; }
+  .indicator-table tr:nth-child(even) td { background: #FAFBFF; }
+  .bar-out { width: 100px; height: 9px; background: #EEE; border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .bar-in  { height: 100%; border-radius: 4px; }
+  .score-val { font-weight: bold; font-size: 9pt; }
+  .score-auth { color: #18794E; }
+  .score-warn { color: #B45309; }
+  .score-deep { color: #B91C1C; }
+  .interp { font-size: 8.5pt; color: #444; font-style: italic; }
+
+  /* XAI */
+  .xai-box { border: 1.5px solid #DDE3F0; border-radius: 4px; padding: 14px 16px; background: #F8FAFF; }
+  .xai-box p { font-size: 10pt; line-height: 1.7; }
+
+  /* Limites */
+  .limits-box { background: #FFFBF0; border: 1.5px solid #D97706; border-radius: 4px; padding: 13px 16px; }
+  .limits-box ul { margin: 6px 0 0 18px; }
+  .limits-box li { font-size: 9.5pt; color: #44350A; margin-bottom: 4px; }
+  .limits-title { font-size: 9pt; font-weight: bold; color: #D97706; text-transform: uppercase; margin-bottom: 6px; }
+
+  /* Manifest */
+  .manifest-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  .manifest-table td { padding: 7px 10px; border-bottom: 1px solid #EEF2FA; }
+  .manifest-table td:first-child { color: #555; width: 38%; font-size: 8.5pt; font-weight: bold; }
+  .hash-cell { font-family: monospace; font-size: 8pt; color: #1B2A4A; word-break: break-all; }
+  .hash-short { font-family: monospace; font-size: 9pt; color: #1B2A4A; }
+
+  /* Références légales */
+  .legal-refs { font-size: 8.5pt; color: #555; border-top: 1px solid #DDE3F0; padding-top: 10px; }
+  .legal-refs li { margin-bottom: 3px; }
+
+  /* Signature */
+  .sig-area { margin-top: 32px; }
+  .sig-grid { display: flex; gap: 30px; }
+  .sig-col { flex: 1; }
+  .sig-line { border-top: 1px solid #1B2A4A; margin-top: 50px; padding-top: 5px; font-size: 8.5pt; color: #555; }
+  .cert-box { font-family: monospace; font-size: 7.5pt; background: #F4F6FB; border: 1px solid #DDE3F0; padding: 8px 12px; border-radius: 4px; margin-top: 14px; word-break: break-all; color: #1B2A4A; }
+
+  .kv { display: flex; justify-content: space-between; font-size: 9.5pt; padding: 4px 0; border-bottom: 1px solid #F0F2F8; }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: #555; font-size: 9pt; }
+  .kv .v { font-weight: bold; font-size: 9pt; text-align: right; }
+  .two-col { display: flex; gap: 16px; }
+  .col { flex: 1; }
+  .card { border: 1.5px solid #DDE3F0; border-radius: 4px; padding: 12px 14px; }
+  .card h3 { font-size: 8.5pt; text-transform: uppercase; color: #1B2A4A; letter-spacing: .04em; border-bottom: 1px solid #DDE3F0; padding-bottom: 4px; margin-bottom: 8px; }
+  .card h3 span { font-style: italic; text-transform: none; font-weight: normal; color: #2D4270; }
+</style>
+</head>
+<body>
+
+<!-- ── EN-TÊTE OFFICIEL ──────────────────────────────────────────────────── -->
+<div class="header">
+  <div class="header-top">
+    <div>
+      <h1>Rapport d'expertise forensique numérique<span>Digital Forensic Expert Report</span></h1>
+      <div class="sub">
+        DeepfakeDetector Canada &nbsp;|&nbsp; {{ generated_at }}<br>
+        Dossier / File: {{ case.case_number }}
+        {% if court_file_number %} &nbsp;|&nbsp; N° tribunal / Court File: {{ court_file_number }}{% endif %}
+      </div>
+    </div>
+    <div class="rnum">{{ report_number }}</div>
+  </div>
+</div>
+
+<!-- ── IDENTIFICATION ───────────────────────────────────────────────────── -->
+<div class="section">
+  <div class="two-col">
+    <div class="col">
+      <div class="card">
+        <h3>Dossier <span>/ Case</span></h3>
+        <div class="kv"><span class="k">N° dossier</span><span class="v">{{ case.case_number }}</span></div>
+        <div class="kv"><span class="k">Titre</span><span class="v" style="font-size:8.5pt">{{ case.title }}</span></div>
+        <div class="kv"><span class="k">Juridiction</span><span class="v">{{ case.jurisdiction | upper }}</span></div>
+        {% if case.court_reference %}<div class="kv"><span class="k">Réf. tribunal</span><span class="v">{{ case.court_reference }}</span></div>{% endif %}
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Expert mandaté <span>/ Expert Witness</span></h3>
+        <div class="kv"><span class="k">Nom</span><span class="v">{{ expert_name or expert.username }}</span></div>
+        {% if expert_title %}<div class="kv"><span class="k">Titre</span><span class="v" style="font-size:8.5pt">{{ expert_title }}</span></div>{% endif %}
+        {% if expert_credentials %}<div class="kv"><span class="k">Accréditations</span><span class="v" style="font-size:8pt">{{ expert_credentials }}</span></div>{% endif %}
+        <div class="kv"><span class="k">Laboratoire</span><span class="v" style="font-size:8.5pt">{{ lab_name }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VERDICT JUDICIAIRE ───────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Conclusion de l'expertise <span>/ Expert Conclusion</span></div>
+  {% set verdict_class = 'authentic' if analysis.verdict.value == 'AUTHENTIQUE' else ('deepfake' if analysis.verdict.value == 'DEEPFAKE DÉTECTÉ' else 'undetermined') %}
+  <div class="verdict-judicial {{ verdict_class }}">
+    <div class="verdict-label">{{ judicial_verdict_fr }}</div>
+    <div class="verdict-sub">{{ judicial_verdict_en }}</div>
+    <div class="verdict-score">
+      Indice de manipulation / Manipulation Index : <strong>{{ "%.1f"|format((analysis.final_score or 0) * 100) }}%</strong>
+      &nbsp;|&nbsp; Intervalle de confiance 95% / 95% CI :
+      [{{ "%.1f"|format((analysis.confidence_low or 0) * 100) }}%,
+       {{ "%.1f"|format((analysis.confidence_high or 0) * 100) }}%]
+    </div>
+  </div>
+  {% if notes_for_court %}
+  <div style="font-size:9.5pt;color:#333;padding:8px 12px;background:#F8F9FB;border-left:3px solid #1B2A4A;margin-top:10px">
+    <strong>Note de l'expert :</strong> {{ notes_for_court }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── FIABILITÉ DU MODÈLE ──────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Fiabilité du système d'analyse <span>/ System Reliability</span></div>
+  {% if reliability_detection_pct is not none and reliability_detection_pct != "N/A" %}
+  <div class="reliability-box">
+    <div class="rel-stat">
+      <div class="big">{{ reliability_detection_pct }}%</div>
+      <div class="lbl">Taux de détection correcte<br><em>Correct detection rate (AUC)</em></div>
+    </div>
+    <div class="rel-stat">
+      <div class="big">{{ reliability_false_alarm }}</div>
+      <div class="lbl">Fausses alarmes sur 1 000 fichiers authentiques<br><em>False alarms per 1,000 authentic files (FAR)</em></div>
+    </div>
+    <div class="rel-stat">
+      <div class="big">{{ reliability_missed }}</div>
+      <div class="lbl">Deepfakes non détectés sur 1 000<br><em>Missed deepfakes per 1,000 files (FRR)</em></div>
+    </div>
+    <div class="rel-stat">
+      <div class="big">{{ eer_pct }}</div>
+      <div class="lbl">Taux d'égalité d'erreur<br><em>Equal Error Rate (EER)</em></div>
+    </div>
+  </div>
+  <p style="font-size:8.5pt;color:#555;font-style:italic">
+    Ces métriques ont été mesurées sur un jeu de test indépendant.
+    Les performances réelles peuvent varier selon la qualité et le type de contenu analysé.
+  </p>
+  {% else %}
+  <div class="limits-box" style="margin-top:10px">
+    <div class="limits-title">Métriques non disponibles / Metrics Not Available</div>
+    <p style="font-size:9.5pt;color:#44350A">
+      Les métriques de performance (FAR/FRR/AUC/EER) n'ont pas encore été mesurées sur un jeu de test indépendant.
+      Aucune estimation de fiabilité quantitative ne peut être fournie à ce stade.
+      La validité des méthodes employées repose sur les publications scientifiques citées en §Références.
+    </p>
+    <p style="font-size:9pt;color:#44350A;font-style:italic;margin-top:6px">
+      Performance metrics (FAR/FRR/AUC/EER) have not yet been measured on an independent test set.
+      No quantitative reliability estimate can be provided at this stage.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── TABLEAU DES INDICATEURS ─────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Indicateurs d'analyse détaillés <span>/ Detailed Analysis Indicators</span></div>
+  <table class="indicator-table">
+    <thead>
+      <tr>
+        <th style="width:30%">Indicateur / Indicator</th>
+        <th style="width:24%">Score</th>
+        <th>Interprétation judiciaire / Court Interpretation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ind in court_indicators %}
+      <tr>
+        <td>
+          <strong>{{ ind.label_fr }}</strong><br>
+          <span style="font-size:8pt;color:#777;font-style:italic">{{ ind.label_en }}</span>
+        </td>
+        <td>
+          <div class="bar-out"><div class="bar-in" style="width:{{ (ind.score * 100)|round }}%;background:{{ '#B91C1C' if ind.score > 0.55 else ('#B45309' if ind.score > 0.35 else '#18794E') }}"></div></div>
+          <span class="score-val {{ 'score-deep' if ind.score > 0.55 else ('score-warn' if ind.score > 0.35 else 'score-auth') }}">{{ "%.0f"|format(ind.score * 100) }}%</span>
+        </td>
+        <td class="interp">{{ ind.court_interpretation }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="display:flex;justify-content:space-between;font-size:8.5pt;margin-top:8px;padding:6px 10px;background:#F0F4F9;border-radius:3px">
+    <span style="color:#18794E">■ 0–35% : Aucun indicateur de manipulation / No manipulation indicator</span>
+    <span style="color:#B45309">■ 35–55% : Anomalie modérée / Moderate anomaly</span>
+    <span style="color:#B91C1C">■ 55–100% : Indicateur de manipulation / Manipulation indicator</span>
+  </div>
+</div>
+
+<!-- ── EXPLICATION XAI SIMPLIFIÉE ──────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Explication accessible <span>/ Plain-Language Explanation</span></div>
+  <div class="xai-box">
+    <p>{{ analysis.xai_plain_explanation or plain_explanation }}</p>
+  </div>
+</div>
+
+<!-- ── LIMITES ET RÉSERVES ─────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Limites de l'expertise et réserves <span>/ Limitations and Caveats</span></div>
+  <div class="limits-box">
+    <div class="limits-title">Ce rapport NE PEUT PAS établir / This report CANNOT establish:</div>
+    <ul>
+      <li>L'identité de la personne ayant créé ou diffusé le contenu manipulé.</li>
+      <li>L'intention ou la connaissance de l'auteur de la manipulation.</li>
+      <li>La fiabilité à 100% : tout système automatisé comporte une marge d'erreur (voir métriques ci-dessus).</li>
+      <li>Que le fichier analysé est une copie intègre de l'original si la chaîne de possession a été rompue avant l'ingestion.</li>
+      <li>La détection de manipulations effectuées postérieurement à la capture (ex. : recadrage, réencodage excessif).</li>
+    </ul>
+    <div style="margin-top:8px;font-size:8.5pt;color:#775500;font-style:italic">
+      Ce rapport constitue une aide à la décision. Conformément à <em>R. c. Mohan</em> [1994] 2 RCS 9,
+      la valeur probante finale relève du tribunal, non de l'outil automatisé.
+    </div>
+  </div>
+</div>
+
+<!-- ── MANIFEST DE LA PREUVE NUMÉRIQUE ─────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Manifest de la preuve numérique <span>/ Digital Evidence Manifest</span></div>
+  <table class="manifest-table">
+    <tr>
+      <td>Fichier analysé / File analyzed</td>
+      <td><span class="hash-cell">{{ media_file.original_filename }}</span></td>
+    </tr>
+    <tr>
+      <td>Empreinte SHA-256 du fichier</td>
+      <td><span class="hash-cell">{{ media_file.hash_sha256 }}</span></td>
+    </tr>
+    <tr>
+      <td>Empreinte BLAKE3 du fichier</td>
+      <td><span class="hash-cell">{{ media_file.hash_blake3 }}</span></td>
+    </tr>
+    <tr>
+      <td>Horodatage TSA RFC 3161</td>
+      <td>{{ media_file.tsa_timestamp or 'Non disponible' }}</td>
+    </tr>
+    <tr>
+      <td>Autorité TSA / TSA Authority</td>
+      <td>{{ tsa_authority }}</td>
+    </tr>
+    <tr>
+      <td>N° rapport / Report number</td>
+      <td><span class="hash-short">{{ report_number }}</span></td>
+    </tr>
+    <tr>
+      <td>Empreinte SHA-256 du rapport</td>
+      <td><span class="hash-cell">{{ report_hash_sha256 }}</span></td>
+    </tr>
+    <tr>
+      <td>Signature RSA-4096 (extrait)</td>
+      <td><span class="hash-short">{{ sig_preview }}</span></td>
+    </tr>
+    <tr>
+      <td>Horodatage TSA du rapport</td>
+      <td>{{ tsa_timestamp }}</td>
+    </tr>
+  </table>
+  <p style="font-size:8pt;color:#555;font-style:italic;margin-top:8px">
+    La signature RSA-4096 complète et le jeton TSA complet sont disponibles en format machine (JSON/PEM)
+    sur demande auprès du laboratoire. Référence légale : LPC art. 31.1–31.6.
+  </p>
+</div>
+
+<!-- ── RÉFÉRENCES LÉGALES ───────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Références légales applicables <span>/ Applicable Legal References</span></div>
+  <ul class="legal-refs">
+    <li><strong>{{ mohan_reference }}</strong> — Critères de recevabilité de la preuve d'expert.</li>
+    <li><strong>{{ lpc_reference }}</strong> — Admissibilité des documents électroniques.</li>
+    <li><strong>{{ jlj_reference }}</strong> — Fiabilité du principe scientifique et technique utilisé.</li>
+    <li><strong>{{ dgsi_reference }}</strong> — Normes de gouvernance numérique applicables.</li>
+    <li><strong>RFC 3161 (IETF)</strong> — Internet X.509 PKI Time-Stamp Protocol (TSP).</li>
+  </ul>
+</div>
+
+<!-- ── SIGNATURE EXPERT ─────────────────────────────────────────────────── -->
+<div class="sig-area">
+  <div class="section-title">Certification de l'expert <span>/ Expert Certification</span></div>
+  <p style="font-size:9.5pt;color:#333;margin-bottom:20px">
+    Je soussigné(e) certifie que ce rapport a été produit conformément aux règles de l'art en matière
+    d'expertise forensique numérique, que les méthodes employées sont fondées sur des principes
+    scientifiques reconnus, et que les conclusions présentées reflètent fidèlement les résultats de l'analyse.
+    <br><em>I hereby certify that this report was produced in accordance with best practices in digital forensic
+    expertise, that the methods employed are based on recognized scientific principles, and that the conclusions
+    accurately reflect the results of the analysis.</em>
+  </p>
+  <div class="sig-grid">
+    <div class="sig-col" style="flex:2">
+      <div class="sig-line">{{ expert_name or expert.username }} — Signature</div>
+    </div>
+    <div class="sig-col" style="flex:1">
+      <div class="sig-line">Date : {{ generated_at[:10] }}</div>
+    </div>
+  </div>
+  <div class="cert-box">
+RAPPORT : {{ report_number }}
+SHA-256  : {{ report_hash_sha256 }}
+RSA-4096 : {{ sig_preview }}
+TSA      : {{ tsa_timestamp }}
+  </div>
+</div>
+
+</body>
+</html>

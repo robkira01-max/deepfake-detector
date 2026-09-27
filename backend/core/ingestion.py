@@ -89,6 +89,9 @@ def ingest_file(
             f"Fichier identique déjà enregistré (UUID: {existing.uuid}, Case: {existing.case_id})"
         )
 
+    # ── Étape 3b : Provenance C2PA ───────────────────────────────────────────
+    c2pa_status, c2pa_producer, c2pa_manifest_json = _read_c2pa(quarantine_path)
+
     # ── Étape 4 : Métadonnées (FFmpeg) ───────────────────────────────────────
     metadata = _extract_metadata(quarantine_path, media_type)
 
@@ -117,6 +120,9 @@ def ingest_file(
         tsa_authority=tsa_authority,
         tsa_timestamp=tsa_timestamp,
         media_metadata=metadata,
+        c2pa_status=c2pa_status,
+        c2pa_producer=c2pa_producer,
+        c2pa_manifest_json=c2pa_manifest_json,
         ingested_by_id=uploader_id,
     )
     db.add(media_file)
@@ -192,6 +198,21 @@ def _classify_media_type(mime: str, ext: str) -> MediaType | None:
     if mime in audio_mimes and ext in audio_exts:
         return MediaType.audio
     return None
+
+
+def _read_c2pa(path: Path) -> tuple[str | None, str | None, dict | None]:
+    """Retourne (c2pa_status, c2pa_producer, c2pa_manifest_json) — never raises."""
+    try:
+        from core.c2pa_handler import C2PAHandler
+        manifest = C2PAHandler.read_manifest(str(path))
+        if manifest is None:
+            return "absent", None, None
+        summary = C2PAHandler.get_provenance_summary(manifest)
+        status = "present" if summary["is_valid"] else "invalid"
+        return status, summary.get("producer"), manifest
+    except Exception as exc:
+        log.warning("c2pa_ingestion_failed", path=str(path), error=str(exc))
+        return "error", None, None
 
 
 def _extract_metadata(path: Path, media_type: MediaType) -> dict:

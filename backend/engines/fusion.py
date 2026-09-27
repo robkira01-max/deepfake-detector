@@ -1,8 +1,12 @@
 """Fusion d'ensemble des scores vidéo + audio + métadonnées.
 
-Formule :
-  score_final = w1·S_texture + w2·S_temporal + w3·S_rppg + w4·S_biometrics
-              + w5·S_audio_model + w6·S_audio_phase + w7·S_metadata
+Formule (composantes actives uniquement) :
+  score_final = Σ (w_i / Σw_actif) · S_i   pour i dans composantes actives
+
+Composante active si :
+  - statut "validated"  → toujours incluse
+  - statut "experimental" → incluse si settings.allow_experimental_engines = True
+  - statut "disabled"   → toujours exclue (ex: Wav2Vec2 tête aléatoire)
 
 Seuils de décision :
   0.00 – 0.35 → AUTHENTIQUE
@@ -11,13 +15,16 @@ Seuils de décision :
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Literal
 
+from config import settings
 from models.analysis import Verdict
 
+EngineStatus = Literal["validated", "experimental", "disabled"]
 
-# Poids de l'ensemble (calibrés sur FaceForensics++ + ASVspoof 2021)
-WEIGHTS = {
+# Poids de l'ensemble (objectif : calibrage sur FaceForensics++ + ASVspoof 2021 après fine-tuning)
+WEIGHTS: dict[str, float] = {
     "texture":    0.20,
     "temporal":   0.15,
     "rppg":       0.18,
@@ -25,6 +32,19 @@ WEIGHTS = {
     "audio":      0.20,
     "phase":      0.10,
     "metadata":   0.07,
+}
+
+# Statut actuel de chaque composante (Brief v3 §0.6 / §6)
+# Remplace l'ancien VALIDATED_COMPONENTS frozenset.
+# Surchargeable par fuse_scores(engine_statuses=...) pour les tests ou le registre.
+ENGINE_DEFAULT_STATUS: dict[str, EngineStatus] = {
+    "texture":    "experimental",  # EfficientNet-B4 poids ImageNet — non fine-tuné deepfake
+    "temporal":   "experimental",  # ResNet-50+LSTM poids ImageNet
+    "rppg":       "experimental",  # algorithme CHROM — fonctionnel, non benchmarké deepfake
+    "biometrics": "experimental",  # EAR+AU — fonctionnel, non benchmarké deepfake
+    "audio":      "disabled",      # Wav2Vec2 tête de classification aléatoire (non entraînée)
+    "phase":      "experimental",  # STFT phase — fonctionnel, non benchmarké deepfake
+    "metadata":   "experimental",  # heuristiques métadonnées — fonctionnel, non benchmarké
 }
 
 THRESHOLD_AUTHENTIC = 0.35
@@ -44,11 +64,16 @@ class FusionResult:
     shap_ranking: list[dict]
     plain_explanation: str
 
-    # Métriques du modèle (issues des benchmarks)
-    model_far: float = 0.018
-    model_frr: float = 0.042
-    model_eer: float = 0.031
-    model_auc: float = 0.974
+    # Composantes exclues du score (disabled ou experimental quand allow=False)
+    unvalidated_components: list[str] = field(default_factory=list)
+    # Composantes incluses mais pas encore validées sur un jeu de test indépendant
+    experimental_components: list[str] = field(default_factory=list)
+
+    # Métriques issues d'un jeu de test indépendant — None si non encore mesurées (Brief v3 §0.5)
+    model_far: float | None = None
+    model_frr: float | None = None
+    model_eer: float | None = None
+    model_auc: float | None = None
 
 
 def fuse_scores(
@@ -59,9 +84,14 @@ def fuse_scores(
     score_audio: float = 0.0,
     score_phase: float = 0.0,
     score_metadata: float = 0.0,
+    engine_statuses: dict[str, EngineStatus] | None = None,
 ) -> FusionResult:
-    """
-    Calcule le score final pondéré et détermine le verdict.
+    """Calcule le score final pondéré et détermine le verdict.
+
+    Args:
+        engine_statuses: Surcharge du statut par composante.
+                         Si None, utilise ENGINE_DEFAULT_STATUS.
+                         Utilisé par le registre de modèles pour appliquer les statuts réels.
     """
     components = {
         "texture":    score_texture,
@@ -73,12 +103,31 @@ def fuse_scores(
         "metadata":   score_metadata,
     }
 
-    # Score pondéré
-    final = sum(WEIGHTS[k] * v for k, v in components.items())
+    statuses = engine_statuses if engine_statuses is not None else ENGINE_DEFAULT_STATUS
+    allow_experimental = settings.allow_experimental_engines
+
+    # Partition des composantes selon le statut
+    active_set = frozenset(
+        k for k, s in statuses.items()
+        if s == "validated" or (s == "experimental" and allow_experimental)
+    )
+    excluded = sorted(k for k in components if k not in active_set)
+    experimental = sorted(
+        k for k, s in statuses.items()
+        if k in active_set and s == "experimental"
+    )
+
+    # Score pondéré — composantes actives uniquement, poids renormalisés
+    valid_weight_sum = sum(WEIGHTS[k] for k in active_set if k in WEIGHTS) or 1.0
+    final = sum(
+        WEIGHTS[k] / valid_weight_sum * v
+        for k, v in components.items()
+        if k in active_set
+    )
     final = max(0.0, min(1.0, final))
 
     # Intervalle de confiance
-    ic_low = max(0.0, final - IC_HALF_WIDTH)
+    ic_low  = max(0.0, final - IC_HALF_WIDTH)
     ic_high = min(1.0, final + IC_HALF_WIDTH)
 
     # Verdict
@@ -89,16 +138,21 @@ def fuse_scores(
     else:
         verdict = Verdict.deepfake
 
-    # Classement SHAP des composantes (contribution relative)
-    weighted = {k: WEIGHTS[k] * v for k, v in components.items()}
+    # Classement SHAP — composantes actives uniquement, poids renormalisés
+    weighted = {
+        k: WEIGHTS[k] / valid_weight_sum * v
+        for k, v in components.items()
+        if k in active_set
+    }
     total_w = sum(weighted.values()) or 1.0
     shap_ranking = sorted(
         [
             {
-                "feature": k,
+                "feature":      k,
                 "contribution": round(v / total_w * 100, 1),
-                "raw_score": round(components[k], 4),
-                "weight": WEIGHTS[k],
+                "raw_score":    round(components[k], 4),
+                "weight":       round(WEIGHTS[k] / valid_weight_sum, 4),
+                "status":       statuses.get(k, "experimental"),
             }
             for k, v in weighted.items()
         ],
@@ -106,7 +160,9 @@ def fuse_scores(
         reverse=True,
     )
 
-    explanation = _generate_plain_explanation(verdict, final, shap_ranking)
+    explanation = _generate_plain_explanation(
+        verdict, final, shap_ranking, excluded, experimental
+    )
 
     return FusionResult(
         final_score=round(final, 4),
@@ -116,14 +172,19 @@ def fuse_scores(
         component_scores={k: round(v, 4) for k, v in components.items()},
         shap_ranking=shap_ranking,
         plain_explanation=explanation,
+        unvalidated_components=excluded,
+        experimental_components=experimental,
     )
 
 
 def _generate_plain_explanation(
-    verdict: Verdict, score: float, ranking: list[dict]
+    verdict: Verdict,
+    score: float,
+    ranking: list[dict],
+    excluded: list[str] | None = None,
+    experimental: list[str] | None = None,
 ) -> str:
-    """
-    Génère une explication en langage clair pour les non-techniciens
+    """Génère une explication en langage clair pour les non-techniciens
     (juges, avocats, banquiers) — exigence XAI du cahier des charges.
     """
     pct = int(score * 100)
@@ -141,13 +202,23 @@ def _generate_plain_explanation(
 
     top_labels = [feature_labels.get(f, f) for f in top_features]
 
+    excl_note = (
+        f" Module(s) exclu(s) du score (non validés) : {', '.join(excluded)}."
+        if excluded else ""
+    )
+    exp_note = (
+        f" Module(s) expérimental(aux) inclus (poids ImageNet, non fine-tunés deepfake) : "
+        f"{', '.join(experimental)}."
+        if experimental else ""
+    )
+
     if verdict == Verdict.authentic:
         return (
             f"Le fichier analysé présente un score de risque de {pct}%, "
             f"ce qui est en dessous du seuil de détection de 35%. "
             f"Le système n'a pas détecté de signes caractéristiques de manipulation numérique. "
             f"Les indicateurs analysés — notamment {', '.join(top_labels[:2])} — "
-            f"sont cohérents avec un enregistrement authentique."
+            f"sont cohérents avec un enregistrement authentique.{excl_note}{exp_note}"
         )
     elif verdict == Verdict.undetermined:
         return (
@@ -155,6 +226,7 @@ def _generate_plain_explanation(
             f"Le système a relevé des anomalies modérées concernant : "
             f"{', '.join(top_labels)}. "
             f"Une expertise humaine complémentaire est recommandée avant de tirer des conclusions."
+            f"{excl_note}{exp_note}"
         )
     else:
         return (
@@ -162,6 +234,6 @@ def _generate_plain_explanation(
             f"dépassant le seuil de détection de 55%. "
             f"Les principales anomalies détectées sont : {', '.join(top_labels)}. "
             f"Ces caractéristiques sont typiques d'une manipulation par intelligence artificielle. "
-            f"Note : ce résultat doit être corroboré par d'autres éléments de preuve "
-            f"(taux d'erreur du modèle : FAR={1.8}%, FRR={4.2}%)."
+            f"Note : ce résultat doit être corroboré par d'autres éléments de preuve."
+            f"{excl_note}{exp_note}"
         )

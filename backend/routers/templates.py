@@ -16,6 +16,7 @@ from config import settings
 from core.security import get_current_user, require_admin, require_analyst
 from database import get_db
 from models.report_template import ReportTemplate, TemplateType
+from models.responses import ADMIN_ERRORS, ANALYST_ERRORS, CRUD_ERRORS, HTTP_401, HTTP_403
 from models.user import User, UserRole
 
 router = APIRouter(prefix="/reports/templates", tags=["Templates de rapport"])
@@ -43,7 +44,7 @@ class TemplateResponse(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.get("", response_model=list[TemplateResponse], summary="Lister les templates disponibles")
+@router.get("", response_model=list[TemplateResponse], summary="Lister les templates disponibles", responses=HTTP_401)
 def list_templates(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
@@ -61,7 +62,7 @@ def list_templates(
     return q.order_by(ReportTemplate.template_type, ReportTemplate.id).all()
 
 
-@router.get("/{template_id}", response_model=TemplateResponse, summary="Détail d'un template")
+@router.get("/{template_id}", response_model=TemplateResponse, summary="Détail d'un template", responses=CRUD_ERRORS)
 def get_template(
     template_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -78,6 +79,7 @@ def get_template(
     response_model=TemplateResponse,
     status_code=201,
     summary="Uploader un template Jinja2 personnalisé (analyst/admin)",
+    responses=ANALYST_ERRORS,
 )
 async def upload_custom_template(
     name: str,
@@ -128,7 +130,7 @@ async def upload_custom_template(
     return tmpl
 
 
-@router.delete("/{template_id}", status_code=204, summary="Supprimer un template custom (admin ou créateur)")
+@router.delete("/{template_id}", status_code=204, summary="Supprimer un template custom (admin ou créateur)", responses=CRUD_ERRORS)
 def delete_template(
     template_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -147,7 +149,7 @@ def delete_template(
     db.commit()
 
 
-@router.post("/{template_id}/set-default", summary="Définir le template par défaut (admin)")
+@router.post("/{template_id}/set-default", summary="Définir le template par défaut (admin)", responses=CRUD_ERRORS)
 def set_default_template(
     template_id: int,
     _: Annotated[User, Depends(require_admin)],
@@ -216,7 +218,7 @@ def _safe_filename(name: str) -> str:
 BUILTIN_TEMPLATES_DATA = [
     {
         "name": "Rapport complet (défaut)",
-        "description": "Rapport forensique complet 8 sections — conforme R. c. Mohan, LPC 31.1-31.6. Recommandé pour usage judiciaire général.",
+        "description": "Rapport forensique complet 8 sections — conçu pour soutenir l'admissibilité en preuve (R. c. Mohan, LPC 31.1-31.6). Recommandé pour usage judiciaire général.",
         "file_path": "rapport_complet.html",
         "jurisdiction": None,
         "language": "fr-en",
@@ -240,7 +242,7 @@ BUILTIN_TEMPLATES_DATA = [
     },
     {
         "name": "Affidavit technique (CPCivQ)",
-        "description": "Affidavit technique conforme au Code de procédure civile du Québec (RLRQ c. C-25.01), art. 282-293. Inclut espace pour commissaire à l'assermentation.",
+        "description": "Affidavit technique structuré selon le Code de procédure civile du Québec (RLRQ c. C-25.01), art. 282-293. Inclut espace pour commissaire à l'assermentation.",
         "file_path": "rapport_affidavit.html",
         "jurisdiction": "quebec",
         "language": "fr-en",

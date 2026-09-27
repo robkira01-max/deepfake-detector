@@ -134,7 +134,7 @@
   <tr><td><strong>1. Nécessité / Necessity</strong></td><td>✅ Satisfait / Met</td><td>Expertise spécialisée requise / Specialized expertise required — au-delà des connaissances ordinaires / beyond ordinary knowledge</td></tr>
   <tr><td><strong>2. Qualifications</strong></td><td>✅ Satisfait / Met</td><td>{{ expert_title or 'Analyste forensique / Forensic analyst' }}, {{ expert_credentials or 'Spécialiste deepfake / Deepfake specialist' }}</td></tr>
   <tr><td><strong>3. Absence d'exclusion <span class="bilabel">No exclusionary rule</span></strong></td><td>✅ Satisfait / Met</td><td>Conforme LPC/CEA 31.1-31.6 — authentification cryptographique / cryptographic authentication</td></tr>
-  <tr><td><strong>4. Fiabilité <span class="bilabel">Reliability</span></strong></td><td>✅ Satisfait / Met</td><td>AUC {{ analysis.model_auc }} | EER {{ "%.1f"|format(analysis.model_eer * 100) }}% | Méthodes publiées / Published methods</td></tr>
+  <tr><td><strong>4. Fiabilité <span class="bilabel">Reliability</span></strong></td><td>{% if analysis.model_auc is not none %}✅ Satisfait / Met{% else %}⚠️ Non évalué / Not evaluated{% endif %}</td><td>{% if analysis.model_auc is not none %}AUC {{ analysis.model_auc }} | EER {{ "%.1f"|format(analysis.model_eer * 100) }}% | {% endif %}Méthodes publiées / Published methods — {% if analysis.model_auc is none %}Validation sur jeu de test indépendant requise / Independent test set validation required{% endif %}</td></tr>
 </table>
 
 <h2>§3 — Méthodologie <span>/ Analysis Methodology</span></h2>
@@ -163,11 +163,14 @@
 <h2>§4 — Métriques de performance <span>/ Model Performance Metrics</span></h2>
 <table>
   <tr><th>Métrique <span>Metric</span></th><th>Valeur <span>Value</span></th><th>Interprétation / Interpretation</th></tr>
-  <tr><td>AUC <span class="bilabel">Area Under ROC Curve</span></td><td><strong>{{ analysis.model_auc }}</strong></td><td>Capacité discriminante / Discriminant capacity — 1.0 = parfait / perfect</td></tr>
-  <tr><td>EER <span class="bilabel">Equal Error Rate</span></td><td><strong>{{ "%.1f"|format(analysis.model_eer * 100) }}%</strong></td><td>Seuil FAR = FRR / Threshold FAR = FRR</td></tr>
-  <tr><td>FAR <span class="bilabel">False Acceptance Rate</span></td><td><strong>{{ "%.1f"|format(analysis.model_far * 100) }}%</strong></td><td>Deepfake classifié authentique / Deepfake classified as authentic</td></tr>
-  <tr><td>FRR <span class="bilabel">False Rejection Rate</span></td><td><strong>{{ "%.1f"|format(analysis.model_frr * 100) }}%</strong></td><td>Authentique classifié deepfake / Authentic classified as deepfake</td></tr>
+  <tr><td>AUC <span class="bilabel">Area Under ROC Curve</span></td><td><strong>{% if analysis.model_auc is not none %}{{ analysis.model_auc }}{% else %}<span style="color:#B45309">Non évalué / Not evaluated</span>{% endif %}</strong></td><td>Capacité discriminante / Discriminant capacity — 1.0 = parfait / perfect</td></tr>
+  <tr><td>EER <span class="bilabel">Equal Error Rate</span></td><td><strong>{% if analysis.model_eer is not none %}{{ "%.1f"|format(analysis.model_eer * 100) }}%{% else %}<span style="color:#B45309">Non évalué / Not evaluated</span>{% endif %}</strong></td><td>Seuil FAR = FRR / Threshold FAR = FRR</td></tr>
+  <tr><td>FAR <span class="bilabel">False Acceptance Rate</span></td><td><strong>{% if analysis.model_far is not none %}{{ "%.1f"|format(analysis.model_far * 100) }}%{% else %}<span style="color:#B45309">Non évalué / Not evaluated</span>{% endif %}</strong></td><td>Deepfake classifié authentique / Deepfake classified as authentic</td></tr>
+  <tr><td>FRR <span class="bilabel">False Rejection Rate</span></td><td><strong>{% if analysis.model_frr is not none %}{{ "%.1f"|format(analysis.model_frr * 100) }}%{% else %}<span style="color:#B45309">Non évalué / Not evaluated</span>{% endif %}</strong></td><td>Authentique classifié deepfake / Authentic classified as deepfake</td></tr>
 </table>
+{% if analysis.model_auc is none %}
+<div class="warn-box">⚠️ Les métriques de performance (AUC/EER/FAR/FRR) n'ont pas encore été mesurées sur un jeu de test indépendant. Validation requise avant usage en contexte judiciaire. / Performance metrics (AUC/EER/FAR/FRR) have not yet been measured on an independent test set. Validation required before judicial use.</div>
+{% endif %}
 
 {% if analysis.xai_suspicious_timecodes %}
 <h3>Segments temporels suspects / Suspicious Time Segments</h3>
@@ -192,7 +195,7 @@
     <ul>
       <li>Modèles pré-entraînés — un <em>fine-tuning</em> sur FaceForensics++ et ASVspoof 2021 améliorerait la précision.</li>
       <li>rPPG et phase STFT : algorithmiques, fiabilité maximale.</li>
-      <li>Aide à la décision uniquement. FAR {{ "%.1f"|format(analysis.model_far * 100) }}% / FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%.</li>
+      <li>Aide à la décision uniquement.{% if analysis.model_far is not none %} FAR {{ "%.1f"|format(analysis.model_far * 100) }}% / FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%.{% else %} Métriques non évaluées — validation indépendante requise.{% endif %}</li>
       <li>Fichiers fortement compressés (&lt;128 kbps) peuvent induire des faux positifs.</li>
     </ul>
   </div>
@@ -201,7 +204,7 @@
     <ul>
       <li>Pre-trained models — fine-tuning on FaceForensics++ and ASVspoof 2021 would improve accuracy.</li>
       <li>rPPG and STFT phase are algorithmic — maximum reliability.</li>
-      <li>Decision-support tool only. FAR {{ "%.1f"|format(analysis.model_far * 100) }}% / FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%.</li>
+      <li>Decision-support tool only.{% if analysis.model_far is not none %} FAR {{ "%.1f"|format(analysis.model_far * 100) }}% / FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%.{% else %} Metrics not yet evaluated — independent validation required.{% endif %}</li>
       <li>Heavily compressed files (&lt;128 kbps) may produce false positives.</li>
     </ul>
   </div>

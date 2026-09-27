@@ -1,0 +1,115 @@
+{% extends "analyst/base.html" %}
+{% set active_page = "dashboard" %}
+{% block title %}Tableau de bord{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Tableau de bord</div>
+    <div class="page-subtitle">Bienvenue, {{ user.username }} — {{ cases|length }} dossier(s) actif(s)</div>
+  </div>
+  <a href="/analyst/cases/new" class="btn btn-primary">
+    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Nouveau dossier
+  </a>
+</div>
+
+<div class="page-body">
+
+  {% if flash %}
+  <div class="flash flash-{{ flash_type|default('info') }}">{{ flash }}</div>
+  {% endif %}
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Dossiers total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.open }}</div>
+      <div class="stat-label">En cours</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-value" style="color:var(--danger)">{{ stats.deepfakes }}</div>
+      <div class="stat-label">Deepfakes détectés</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-value" style="color:var(--success)">{{ stats.authentic }}</div>
+      <div class="stat-label">Authentiques confirmés</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.analyses }}</div>
+      <div class="stat-label">Analyses totales</div>
+    </div>
+  </div>
+
+  <!-- Recent cases -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
+        </svg>
+        Dossiers récents
+      </span>
+    </div>
+
+    {% if cases %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>N° dossier</th>
+            <th>Titre / Sujet</th>
+            <th>Juridiction</th>
+            <th>Statut</th>
+            <th>Analyses</th>
+            <th>Créé le</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for case in cases %}
+          <tr>
+            <td><span class="font-mono text-accent" style="font-size:12px">{{ case.case_number }}</span></td>
+            <td>
+              <div class="fw-bold" style="font-size:13px">{{ case.title }}</div>
+              {% if case.defendant %}<div class="text-muted text-xs">Défendeur : {{ case.defendant }}</div>{% endif %}
+            </td>
+            <td><span class="badge badge-neutral">{{ case.jurisdiction.value }}</span></td>
+            <td>
+              {% if case.status.value == 'open' %}
+                <span class="badge badge-accent">Ouvert</span>
+              {% elif case.status.value == 'in_analysis' %}
+                <span class="badge badge-info">En analyse</span>
+              {% elif case.status.value == 'completed' %}
+                <span class="badge badge-success">Complété</span>
+              {% else %}
+                <span class="badge badge-neutral">{{ case.status.value }}</span>
+              {% endif %}
+            </td>
+            <td class="td-muted">{{ case_analysis_counts.get(case.id, 0) }}</td>
+            <td class="td-muted">{{ case.created_at.strftime('%Y-%m-%d') }}</td>
+            <td>
+              <a href="/analyst/cases/{{ case.id }}" class="btn btn-secondary btn-sm">Ouvrir →</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
+      </svg>
+      <h3>Aucun dossier</h3>
+      <p>Créez votre premier dossier forensique pour commencer.</p>
+      <a href="/analyst/cases/new" class="btn btn-primary">Créer un dossier</a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

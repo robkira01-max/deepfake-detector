@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+{% block title %}Journal d'audit{% endblock %}
+{% block page_title %}Journal d'audit{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Entrées d'audit</span>
+    <form method="get" action="/admin/audit" style="display:flex; gap:8px; margin:0">
+      <input class="form-input" type="text" name="username" value="{{ username_filter or '' }}"
+             placeholder="Filtrer par utilisateur" style="width:180px; padding:6px 10px; font-size:13px">
+      <select class="form-select" name="action" style="width:220px; padding:6px 10px; font-size:13px">
+        <option value="">Toutes les actions</option>
+        {% for a in actions %}
+        <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-neutral">Filtrer</button>
+      {% if username_filter or action_filter %}
+      <a href="/admin/audit" class="btn btn-ghost">Effacer</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Heure</th>
+          <th>Utilisateur</th>
+          <th>Action</th>
+          <th>Ressource</th>
+          <th>Détails</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="mono text-muted" style="white-space:nowrap">
+            {{ entry.timestamp.strftime('%Y-%m-%d %H:%M') if entry.timestamp else '—' }}
+          </td>
+          <td style="font-weight:500">{{ entry.user_username or '(système)' }}</td>
+          <td>
+            {% set action = entry.action.value if entry.action else '' %}
+            {% if 'DELETE' in action or 'FAIL' in action or 'DENIED' in action %}
+              <span class="badge badge-danger">{{ action }}</span>
+            {% elif 'CREATE' in action or 'REGISTER' in action %}
+              <span class="badge badge-success">{{ action }}</span>
+            {% elif 'LOGIN' in action %}
+              <span class="badge badge-info">{{ action }}</span>
+            {% else %}
+              <span class="badge badge-neutral">{{ action }}</span>
+            {% endif %}
+          </td>
+          <td class="text-sm">
+            {% if entry.resource_type %}
+              <span class="text-muted">{{ entry.resource_type }}</span>
+              {% if entry.resource_id %}
+                <span class="mono"> #{{ entry.resource_id }}</span>
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td class="text-sm text-muted mono" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
+            {% if entry.details %}
+              {{ entry.details | string | truncate(80) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-muted" style="text-align:center; padding:32px">
+            Aucune entrée d'audit
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="flex-between mt-4" style="padding-top:12px; border-top:1px solid var(--border)">
+    <span class="text-sm text-muted">
+      Entrées {{ skip + 1 }}–{{ [skip + limit, total] | min }} sur {{ total }}
+    </span>
+    <div class="pagination" style="margin-top:0">
+      {% if skip > 0 %}
+      <a href="/admin/audit?skip={{ [skip - limit, 0] | max }}&limit={{ limit }}{% if username_filter %}&username={{ username_filter }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}">&laquo; Préc.</a>
+      {% endif %}
+      {% if skip + limit < total %}
+      <a href="/admin/audit?skip={{ skip + limit }}&limit={{ limit }}{% if username_filter %}&username={{ username_filter }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}">Suiv. &raquo;</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

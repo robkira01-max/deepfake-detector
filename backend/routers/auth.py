@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Annotated
 
+import redis as _redis_lib
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -16,17 +18,46 @@ from sqlalchemy.orm import Session
 
 _limiter = Limiter(key_func=get_remote_address)
 
-# ── Lockout par username (thread-safe, in-process) ───────────────────────────
+# ── Lockout par username (Redis-backed, in-process fallback) ─────────────────
 _MAX_ATTEMPTS = 5       # échecs avant verrouillage
 _LOCKOUT_SECONDS = 300  # 5 minutes
-_WINDOW_SECONDS = 60    # fenêtre de comptage
 
 _login_failures: dict[str, list[float]] = defaultdict(list)
 _lock = Lock()
+_lockout_redis: _redis_lib.Redis | None = None
+_lockout_redis_checked: bool = False
+
+
+def _get_lockout_redis() -> _redis_lib.Redis | None:
+    """Connexion Redis partagée entre workers (lazy, cachée). None si indisponible."""
+    global _lockout_redis, _lockout_redis_checked
+    if _lockout_redis_checked:
+        return _lockout_redis
+    try:
+        from config import settings as _s
+        r = _redis_lib.from_url(_s.redis_url, decode_responses=True, socket_connect_timeout=1)
+        r.ping()
+        _lockout_redis = r
+    except Exception:
+        _lockout_redis = None
+    _lockout_redis_checked = True
+    return _lockout_redis
 
 
 def _check_lockout(username: str) -> None:
     """Lève 429 si le compte est temporairement verrouillé."""
+    r = _get_lockout_redis()
+    if r is not None:
+        count = r.get(f"login:fail:{username}")
+        if count and int(count) >= _MAX_ATTEMPTS:
+            ttl = max(r.ttl(f"login:fail:{username}"), 0)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Compte temporairement verrouillé. Réessayez dans {ttl}s.",
+                headers={"Retry-After": str(ttl)},
+            )
+        return
+    # Fallback in-process (un seul worker ; acceptable en dev sans Redis)
     now = time.monotonic()
     with _lock:
         attempts = [t for t in _login_failures[username] if now - t < _LOCKOUT_SECONDS]
@@ -41,14 +72,28 @@ def _check_lockout(username: str) -> None:
 
 
 def _record_failure(username: str) -> None:
+    r = _get_lockout_redis()
+    if r is not None:
+        key = f"login:fail:{username}"
+        count = r.incr(key)
+        if count == 1:
+            r.expire(key, _LOCKOUT_SECONDS)
+        return
     with _lock:
         _login_failures[username].append(time.monotonic())
 
 
 def _clear_failures(username: str) -> None:
+    r = _get_lockout_redis()
+    if r is not None:
+        r.delete(f"login:fail:{username}")
+        return
     with _lock:
         _login_failures.pop(username, None)
 
+from models.responses import (
+    AUTH_ERRORS, ADMIN_ERRORS, HTTP_401, HTTP_403, HTTP_409, HTTP_422,
+)
 from core.security import (
     create_access_token,
     create_refresh_token,
@@ -180,9 +225,18 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.post("/token", response_model=TokenResponse, summary="Connexion (OAuth2 Password Flow)")
+@router.post(
+    "/token",
+    response_model=TokenResponse,
+    summary="Connexion (OAuth2 Password Flow)",
+    responses={**AUTH_ERRORS, **ADMIN_ERRORS},
+)
 @_limiter.limit("5/minute")
 def login(
     request: Request,
@@ -222,7 +276,7 @@ def login(
     )
 
 
-@router.post("/mfa/verify", response_model=TokenResponse, summary="Vérification MFA TOTP")
+@router.post("/mfa/verify", response_model=TokenResponse, summary="Vérification MFA TOTP", responses=AUTH_ERRORS)
 @_limiter.limit("5/minute")
 def verify_mfa(
     request: Request,
@@ -255,7 +309,7 @@ def verify_mfa(
     )
 
 
-@router.post("/mfa/setup", response_model=MFASetupResponse, summary="Configurer MFA TOTP")
+@router.post("/mfa/setup", response_model=MFASetupResponse, summary="Configurer MFA TOTP", responses=HTTP_401)
 def setup_mfa(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
@@ -281,7 +335,7 @@ class MFAEnableRequest(BaseModel):
         return v
 
 
-@router.post("/mfa/enable", summary="Activer MFA après vérification du premier code")
+@router.post("/mfa/enable", summary="Activer MFA après vérification du premier code", responses={**HTTP_401, **HTTP_422})
 def enable_mfa(
     body: MFAEnableRequest,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -297,7 +351,7 @@ def enable_mfa(
     return {"message": "MFA activé avec succès"}
 
 
-@router.post("/users", response_model=UserResponse, summary="Créer un utilisateur (admin)")
+@router.post("/users", response_model=UserResponse, summary="Créer un utilisateur (admin)", responses={**ADMIN_ERRORS, **HTTP_422, **HTTP_409})
 def create_user(
     body: UserCreateRequest,
     _: Annotated[User, Depends(require_admin)],
@@ -321,7 +375,7 @@ def create_user(
     return user
 
 
-@router.get("/users", response_model=list[UserResponse], summary="Lister les utilisateurs (admin)")
+@router.get("/users", response_model=list[UserResponse], summary="Lister les utilisateurs (admin)", responses=ADMIN_ERRORS)
 def list_users(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
@@ -331,12 +385,12 @@ def list_users(
     return db.query(User).order_by(User.id).offset(skip).limit(min(limit, 200)).all()
 
 
-@router.get("/me", response_model=UserResponse, summary="Profil de l'utilisateur courant")
+@router.get("/me", response_model=UserResponse, summary="Profil de l'utilisateur courant", responses=HTTP_401)
 def me(current_user: Annotated[User, Depends(get_current_user)]) -> User:
     return current_user
 
 
-@router.post("/refresh", response_model=TokenResponse, summary="Renouveler le token d'accès")
+@router.post("/refresh", response_model=TokenResponse, summary="Renouveler le token d'accès", responses=AUTH_ERRORS)
 @_limiter.limit("10/minute")
 def refresh_token(
     request: Request,
@@ -352,37 +406,48 @@ def refresh_token(
     if not user:
         raise HTTPException(status_code=401, detail="Utilisateur introuvable ou désactivé")
 
-    new_access_token = create_access_token(user.username, user.role.value)
+    # Rotate: revoke old refresh token, issue a new one
+    old_jti = payload.get("jti", "")
+    if old_jti:
+        revoke_token(old_jti, settings.refresh_token_expire_days * 86400)
+
     return TokenResponse(
-        access_token=new_access_token,
-        refresh_token=body.refresh_token,  # stateless — do not rotate
+        access_token=create_access_token(user.username, user.role.value),
+        refresh_token=create_refresh_token(user.username),
     )
 
 
-@router.post("/logout", summary="Révoquer les tokens (déconnexion)")
+@router.post("/logout", summary="Révoquer les tokens (déconnexion)", responses=HTTP_401)
 def logout(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    body: LogoutRequest | None = None,
 ) -> dict:
-    # Extract the raw Bearer token to get its jti for revocation
-    from core.security import oauth2_scheme
     from jose import jwt as _jwt
+
+    def _revoke_raw(raw_token: str, ttl: int) -> None:
+        try:
+            p = _jwt.decode(
+                raw_token,
+                settings.jwt_public_key,
+                algorithms=[settings.jwt_algorithm],
+                options={"verify_exp": False},
+            )
+            jti = p.get("jti", "")
+            if jti:
+                revoke_token(jti, ttl)
+        except Exception:
+            pass
+
+    # Revoke access token
     auth_header = request.headers.get("Authorization", "")
-    token = auth_header.removeprefix("Bearer ").strip()
-    try:
-        payload = _jwt.decode(
-            token,
-            settings.jwt_public_key,
-            algorithms=[settings.jwt_algorithm],
-            options={"verify_exp": False},
-        )
-        jti = payload.get("jti", "")
-        if jti:
-            ttl = settings.access_token_expire_minutes * 60
-            revoke_token(jti, ttl)
-    except Exception:
-        pass  # Token already validated upstream by get_current_user; best-effort revocation
+    access_raw = auth_header.removeprefix("Bearer ").strip()
+    _revoke_raw(access_raw, settings.access_token_expire_minutes * 60)
+
+    # Revoke refresh token if provided — prevents re-use after logout
+    if body and body.refresh_token:
+        _revoke_raw(body.refresh_token, settings.refresh_token_expire_days * 86400)
 
     ip = request.client.host if request.client else ""
     _audit(db, current_user, AuditAction.USER_LOGOUT, ip=ip)

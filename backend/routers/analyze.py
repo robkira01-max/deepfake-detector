@@ -15,6 +15,7 @@ from config import settings
 from core.ingestion import ingest_file, IngestionError
 from core.security import require_analyst, require_any, get_current_user
 from database import get_db
+from models.responses import ANALYST_ERRORS, CRUD_ERRORS, HTTP_401, HTTP_403
 from models.analysis import Analysis, AnalysisStatus, Verdict
 from models.case import Case
 from models.media_file import MediaFile
@@ -72,6 +73,7 @@ class AnalysisResponse(BaseModel):
     response_model=UploadResponse,
     status_code=201,
     summary="Déposer un fichier média dans un dossier",
+    responses=CRUD_ERRORS,
 )
 async def upload_media(
     case_id: int,
@@ -133,6 +135,7 @@ async def upload_media(
     response_model=AnalysisResponse,
     status_code=202,
     summary="Démarrer l'analyse deepfake (asynchrone via Celery)",
+    responses=CRUD_ERRORS,
 )
 def start_analysis(
     media_file_id: int,
@@ -173,6 +176,7 @@ def start_analysis(
     "/{analysis_id}",
     response_model=AnalysisResponse,
     summary="Résultat d'une analyse",
+    responses=CRUD_ERRORS,
 )
 def get_analysis(
     analysis_id: int,
@@ -194,6 +198,7 @@ def get_analysis(
     "/case/{case_id}",
     response_model=list[AnalysisResponse],
     summary="Toutes les analyses d'un dossier",
+    responses={**HTTP_401, **HTTP_403},
 )
 def list_case_analyses(
     case_id: int,

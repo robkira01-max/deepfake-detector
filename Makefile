@@ -20,10 +20,13 @@ help:
 	@echo "    make demo       — Serveur demo investisseurs (port 8080)"
 	@echo ""
 	@echo "  Tests :"
-	@echo "    make test       — Suite complète (183 tests)"
-	@echo "    make coverage   — Tests + rapport couverture HTML"
-	@echo "    make lint       — Vérification types (mypy)"
-	@echo "    make bandit     — Scan SAST sécurité"
+	@echo "    make test             — Suite unitaire (548+ tests, skip integration)"
+	@echo "    make test-fast        — Suite unitaire rapide (stop au 1er echec)"
+	@echo "    make test-integration — Tests integration PostgreSQL+Redis (Docker)"
+	@echo "    make test-all         — Tous les tests (unitaires + integration)"
+	@echo "    make coverage         — Tests + rapport couverture HTML"
+	@echo "    make lint             — Verification types (mypy)"
+	@echo "    make bandit           — Scan SAST securite"
 	@echo ""
 	@echo "  Docker :"
 	@echo "    make up         — Lance tous les services Docker"
@@ -59,10 +62,18 @@ dev:
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 test:
-	@$(VENV) && cd $(BACK) && python -m pytest tests/ -q --tb=short
+	@$(VENV) && cd $(BACK) && python -m pytest tests/ -q --tb=short -m "not integration"
 
 test-fast:
-	@$(VENV) && cd $(BACK) && python -m pytest tests/ -q --tb=short -x
+	@$(VENV) && cd $(BACK) && python -m pytest tests/ -q --tb=short -x -m "not integration"
+
+test-integration:
+	@echo "Tests d integration (PostgreSQL + Redis via Docker)..."
+	@$(VENV) && cd $(BACK) && python -m pytest tests/test_integration.py -v -m integration
+
+test-all:
+	@echo "Suite complete (unitaires + integration)..."
+	@$(VENV) && cd $(BACK) && python -m pytest tests/ -v --tb=short
 
 coverage:
 	@$(VENV) && cd $(BACK) && python -m pytest tests/ \

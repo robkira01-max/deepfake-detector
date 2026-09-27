@@ -124,7 +124,7 @@
   <p>VERDICT : {{ analysis.verdict }} &nbsp;/&nbsp; FINDING: {{ verdict_en }}</p>
   <p>Score de risque fustionne / Weighted fused risk score : <strong>{{ "%.1f"|format(analysis.final_score * 100) }}%</strong></p>
   <p>IC 95% / 95% CI : [{{ "%.1f"|format(analysis.confidence_low * 100) }}%, {{ "%.1f"|format(analysis.confidence_high * 100) }}%]</p>
-  <p>Metriques / Metrics : AUC {{ analysis.model_auc }}, EER {{ "%.1f"|format(analysis.model_eer * 100) }}%, FAR {{ "%.1f"|format(analysis.model_far * 100) }}%, FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%</p>
+  <p>Metriques / Metrics : {% if analysis.model_auc is not none %}AUC {{ analysis.model_auc }}, EER {{ "%.1f"|format(analysis.model_eer * 100) }}%, FAR {{ "%.1f"|format(analysis.model_far * 100) }}%, FRR {{ "%.1f"|format(analysis.model_frr * 100) }}%{% else %}Non evaluees — validation independante requise / Not yet evaluated — independent validation required{% endif %}</p>
 </div>
 
 <div class="bi-block">
@@ -133,8 +133,8 @@
 </div>
 
 <div class="bi-block">
-  <div class="bi-fr"><div class="bi-lang">Limitations et reserves</div><p class="para"><span class="num">9.</span>Les modeles utilises reposent sur des poids pre-entrained. Les conclusions representent une evaluation probabiliste. FAR {{ "%.1f"|format(analysis.model_far * 100) }}%. La decision finale quant a la valeur probante appartient au tribunal.</p></div>
-  <div class="bi-en"><div class="bi-lang">Limitations and Reservations</div><p class="para"><span class="num">9.</span>The models use pre-trained weights. The conclusions represent a probabilistic assessment. FAR {{ "%.1f"|format(analysis.model_far * 100) }}%. The final determination of probative value rests with the court.</p></div>
+  <div class="bi-fr"><div class="bi-lang">Limitations et reserves</div><p class="para"><span class="num">9.</span>Les modeles utilises reposent sur des poids pre-entrained. Les conclusions representent une evaluation probabiliste.{% if analysis.model_far is not none %} FAR {{ "%.1f"|format(analysis.model_far * 100) }}%.{% else %} Metriques de performance non evaluees — validation independante requise.{% endif %} La decision finale quant a la valeur probante appartient au tribunal.</p></div>
+  <div class="bi-en"><div class="bi-lang">Limitations and Reservations</div><p class="para"><span class="num">9.</span>The models use pre-trained weights. The conclusions represent a probabilistic assessment.{% if analysis.model_far is not none %} FAR {{ "%.1f"|format(analysis.model_far * 100) }}%.{% else %} Performance metrics not yet evaluated — independent validation required.{% endif %} The final determination of probative value rests with the court.</p></div>
 </div>
 
 {% if notes_for_court %}<div class="note-box"><strong>Note au tribunal / Note to Court :</strong> {{ notes_for_court }}</div>{% endif %}

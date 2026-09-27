@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion — DeepfakeDetector Canada</title>
+  <link rel="stylesheet" href="/admin/static/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>&#128274; DeepfakeDetector</h1>
+      <p>Panneau d'administration</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/admin/login">
+      <div class="form-group">
+        <label class="form-label" for="username">Nom d'utilisateur</label>
+        <input class="form-input" type="text" id="username" name="username"
+               value="{{ username or '' }}" autocomplete="username"
+               autofocus required placeholder="admin">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Mot de passe</label>
+        <input class="form-input" type="password" id="password" name="password"
+               autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="login-btn">Connexion</button>
+    </form>
+
+    <p class="text-muted text-sm" style="text-align:center; margin-top:20px">
+      Accès réservé aux administrateurs — LPRPDE
+    </p>
+  </div>
+</div>
+</body>
+</html>

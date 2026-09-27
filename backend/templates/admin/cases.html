@@ -1,0 +1,98 @@
+{% extends "admin/base.html" %}
+{% block title %}Dossiers{% endblock %}
+{% block page_title %}Dossiers judiciaires{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Dossiers ({{ total }})</span>
+    <div style="display:flex; gap:8px; align-items:center">
+      <form method="get" action="/admin/cases" style="display:flex; gap:8px; margin:0">
+        <select class="form-select" name="status" style="width:140px; padding:6px 10px; font-size:13px"
+                onchange="this.form.submit()">
+          <option value="">Tous les statuts</option>
+          <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Ouvert</option>
+          <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Fermé</option>
+          <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archivé</option>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Titre</th>
+          <th>Statut</th>
+          <th>Créateur</th>
+          <th>Créé le</th>
+          <th>Analyses</th>
+          <th>Rapports</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in cases %}
+        <tr>
+          <td class="mono text-muted">{{ row.case.id }}</td>
+          <td>
+            <span style="font-weight:500">{{ row.case.title }}</span>
+            {% if row.case.case_number %}
+            <div class="text-sm text-muted mono">{{ row.case.case_number }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.case.status.value == 'open' %}
+              <span class="badge badge-info">ouvert</span>
+            {% elif row.case.status.value == 'closed' %}
+              <span class="badge badge-neutral">fermé</span>
+            {% else %}
+              <span class="badge badge-warning">{{ row.case.status.value }}</span>
+            {% endif %}
+          </td>
+          <td class="text-sm">
+            {{ row.owner_username or '—' }}
+          </td>
+          <td class="text-sm text-muted">
+            {{ row.case.created_at.strftime('%Y-%m-%d') if row.case.created_at else '—' }}
+          </td>
+          <td class="text-sm">{{ row.analysis_count }}</td>
+          <td class="text-sm">{{ row.report_count }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-muted" style="text-align:center; padding:32px">
+            Aucun dossier
+            {% if status_filter %} avec le statut "{{ status_filter }}"{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if total > page_size %}
+  <div class="pagination">
+    {% if page > 1 %}
+    <a href="/admin/cases?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo;</a>
+    {% endif %}
+
+    {% for p in range(1, (total // page_size) + 2) %}
+    {% if p <= (total // page_size) + 1 %}
+    {% if p == page %}
+      <span class="current">{{ p }}</span>
+    {% elif p <= page + 3 and p >= page - 3 %}
+      <a href="/admin/cases?page={{ p }}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ p }}</a>
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+    {% if page * page_size < total %}
+    <a href="/admin/cases?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&raquo;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

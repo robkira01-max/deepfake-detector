@@ -9,6 +9,7 @@ from database import Base
 class MediaType(str, enum.Enum):
     video = "video"
     audio = "audio"
+    document = "document"
 
 
 class MediaStatus(str, enum.Enum):
@@ -53,6 +54,11 @@ class MediaFile(Base):
 
     # Métadonnées extraites (FFmpeg / EXIF)
     media_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # C2PA — provenance cryptographique (Phase 5)
+    c2pa_status: Mapped[str | None] = mapped_column(String(16), nullable=True)   # present|absent|invalid|error
+    c2pa_producer: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    c2pa_manifest_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Dates
     ingested_at: Mapped[datetime] = mapped_column(

@@ -63,6 +63,8 @@ mock.patch.object(_sec_module, "is_revoked", return_value=False).start()
 from main import app                 # noqa: E402
 from models.user import User, UserRole  # noqa: E402
 from core.security import hash_password, create_access_token  # noqa: E402
+# Ensure FK target tables are registered before create_all
+from models import training_protocol as _training_protocol_module  # noqa: F401, E402
 
 
 # ── Base de données en mémoire ────────────────────────────────────────────────

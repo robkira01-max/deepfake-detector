@@ -54,11 +54,6 @@ class VideoScores:
 class VideoEngine:
     """Moteur d'analyse vidéo deepfake avec implémentation réelle."""
 
-    MODEL_FAR = 0.018
-    MODEL_FRR = 0.042
-    MODEL_EER = 0.031
-    MODEL_AUC = 0.974
-
     FRAME_SAMPLE_FPS = 5
     FACE_SEQUENCE_LEN = 16
     RPPG_WINDOW_SEC = 10.0

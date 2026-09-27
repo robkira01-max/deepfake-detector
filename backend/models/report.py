@@ -1,4 +1,4 @@
-"""Rapport d'expertise forensique généré — conforme R. c. Mohan."""
+"""Rapport d'expertise forensique généré — conçu pour soutenir l'admissibilité en preuve (R. c. Mohan [1994] 2 RCS 9)."""
 from datetime import datetime, timezone
 from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship

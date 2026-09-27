@@ -136,7 +136,7 @@
   <tr><td>Nécessité / Necessity</td><td>✅ Satisfait / Met</td><td>Technical expertise beyond ordinary knowledge</td></tr>
   <tr><td>Qualifications de l'expert / Expert qualifications</td><td>✅ Satisfait / Met</td><td>{{ expert_title or 'Forensic analyst' }}, {{ expert_credentials or 'Deepfake forensics specialist' }}</td></tr>
   <tr><td>Absence de règle d'exclusion / No exclusionary rule</td><td>✅ Satisfait / Met</td><td>CEA 31.1-31.6 — cryptographic authentication</td></tr>
-  <tr><td>Fiabilité / Reliability</td><td>✅ Satisfait / Met</td><td>AUC {{ analysis.model_auc }} | EER {{ "%.1f"|format(analysis.model_eer * 100) }}% | Published methods</td></tr>
+  <tr><td>Fiabilité / Reliability</td><td>{% if analysis.model_auc is not none %}✅ Satisfait / Met{% else %}⚠️ Non évalué / Not evaluated{% endif %}</td><td>{% if analysis.model_auc is not none %}AUC {{ analysis.model_auc }} | EER {{ "%.1f"|format(analysis.model_eer * 100) }}% | {% endif %}Published methods{% if analysis.model_auc is none %} — Validation sur jeu de test indépendant requise / Independent test set validation required{% endif %}</td></tr>
 </table>
 
 <!-- §4 Méthodologie / Methodology -->
@@ -176,11 +176,11 @@
 <div class="bilingual">
   <div class="lang-fr">
     <div class="lang-label fr">Français</div>
-    <p>Les modèles utilisent des poids pré-entraînés. Un <em>fine-tuning</em> sur FaceForensics++ améliorerait la précision. Ce rapport constitue une aide à la décision — le taux d'erreur FAR est {{ "%.1f"|format(analysis.model_far * 100) }}%.</p>
+    <p>Les modèles utilisent des poids pré-entraînés. Un <em>fine-tuning</em> sur FaceForensics++ améliorerait la précision. Ce rapport constitue une aide à la décision.{% if analysis.model_far is not none %} Le taux d'erreur FAR est {{ "%.1f"|format(analysis.model_far * 100) }}%.{% else %} Métriques non évaluées — validation indépendante requise.{% endif %}</p>
   </div>
   <div class="lang-en">
     <div class="lang-label en">English</div>
-    <p>Models use pre-trained weights. Fine-tuning on FaceForensics++ would improve accuracy. This report is a decision-support tool — the FAR error rate is {{ "%.1f"|format(analysis.model_far * 100) }}%.</p>
+    <p>Models use pre-trained weights. Fine-tuning on FaceForensics++ would improve accuracy. This report is a decision-support tool.{% if analysis.model_far is not none %} The FAR error rate is {{ "%.1f"|format(analysis.model_far * 100) }}%.{% else %} Metrics not yet evaluated — independent validation required.{% endif %}</p>
   </div>
 </div>
 

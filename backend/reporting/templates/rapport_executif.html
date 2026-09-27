@@ -144,10 +144,14 @@
   <div class="col">
     <div class="card">
       <h3>Performance du modèle <span>/ Model Performance</span></h3>
+      {% if analysis.model_auc is not none %}
       <div class="kv"><span class="k">AUC</span><span class="v">{{ analysis.model_auc }}</span></div>
       <div class="kv"><span class="k">EER</span><span class="v">{{ "%.1f"|format(analysis.model_eer * 100) }}%</span></div>
       <div class="kv"><span class="k">FAR</span><span class="v">{{ "%.1f"|format(analysis.model_far * 100) }}%</span></div>
       <div class="kv"><span class="k">FRR</span><span class="v">{{ "%.1f"|format(analysis.model_frr * 100) }}%</span></div>
+      {% else %}
+      <div class="kv"><span class="k">Fiabilité / Reliability</span><span class="v" style="color:#B45309">Non évaluée — validation indépendante requise</span></div>
+      {% endif %}
     </div>
   </div>
   <div class="col">

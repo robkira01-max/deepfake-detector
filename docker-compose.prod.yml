@@ -7,6 +7,13 @@
 #   - Restart always
 #   - Ports DB/Redis non exposés (seulement via réseau interne Docker)
 #   - Ressources limitées
+#   - Let's Encrypt SSL via certbot (HTTP-01 ACME challenge)
+#
+# Procédure initiale Let's Encrypt :
+#   1. Configurer CERTBOT_DOMAIN et CERTBOT_EMAIL dans .env
+#   2. docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm certbot-init
+#   3. docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Les renouvellements sont automatiques (certbot renew --webroot toutes les 12h)
 
 services:
 
@@ -73,16 +80,74 @@ services:
       - "127.0.0.1:9000:9000"   # API S3 seulement, pas de console
     restart: always
 
-  # ── Nginx — TLS certs production depuis /etc/ssl/deepfake/ ───────────────────
+  # ── Nginx — TLS certs production depuis Let's Encrypt ────────────────────────
   nginx:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /etc/ssl/deepfake:/etc/nginx/ssl:ro    # Certs Let's Encrypt (prod)
+      - ./nginx/entrypoint.sh:/entrypoint.sh:ro    # Script de symlink LE certs
+      - letsencrypt_certs:/etc/letsencrypt:ro      # Certs Let's Encrypt (prod)
+      - certbot_webroot:/var/www/certbot:ro         # ACME HTTP-01 challenge
       - nginx_logs:/var/log/nginx
+    entrypoint: ["/entrypoint.sh"]
+    environment:
+      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN:-deepfake-detector.ca}
     restart: always
+
+  # ── Certbot — Renouvellement automatique Let's Encrypt ───────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    environment:
+      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN:-deepfake-detector.ca}
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-ssl@deepfake-detector.ca}
+    # Renouvellement automatique toutes les 12h — certbot ne renouvelle que si
+    # le cert expire dans moins de 30 jours (idempotent).
+    command: >
+      sh -c "trap exit TERM;
+             while :; do
+               certbot renew
+                 --webroot
+                 --webroot-path=/var/www/certbot
+                 --non-interactive
+                 --agree-tos
+                 --quiet
+               && nginx -s reload 2>/dev/null || true;
+               sleep 43200;
+             done"
+    depends_on:
+      - nginx
+
+  # ── Certbot Init — Obtention initiale du certificat (run once) ───────────────
+  # docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm certbot-init
+  certbot-init:
+    image: certbot/certbot:latest
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    environment:
+      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN:-deepfake-detector.ca}
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-ssl@deepfake-detector.ca}
+    command: >
+      certonly
+        --webroot
+        --webroot-path=/var/www/certbot
+        --non-interactive
+        --agree-tos
+        --email ${CERTBOT_EMAIL:-ssl@deepfake-detector.ca}
+        -d ${CERTBOT_DOMAIN:-deepfake-detector.ca}
+        -d www.${CERTBOT_DOMAIN:-deepfake-detector.ca}
+    profiles:
+      - init   # Ne démarre pas automatiquement
 
   # ── Flower — Désactivé en production (ou derrière auth stricte) ──────────────
   flower:
     ports: []       # Ne pas exposer Flower publiquement
     restart: always
     # Pour accès admin seulement : tunnel SSH ou VPN
+
+volumes:
+  letsencrypt_certs:   # Certificats Let's Encrypt (clés privées + certs)
+  certbot_webroot:     # Webroot pour ACME HTTP-01 challenge

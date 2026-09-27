@@ -29,4 +29,5 @@ def get_db():
 
 def init_db() -> None:
     from models import user, case, media_file, audit_log, analysis, report, report_template  # noqa: F401
+    from models import model_version, feedback, kyc_verification, training_protocol  # noqa: F401
     Base.metadata.create_all(bind=engine)

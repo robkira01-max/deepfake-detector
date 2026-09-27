@@ -60,11 +60,18 @@ class TestFusionEngine:
             assert 0.0 <= result.final_score <= 1.0, f"Score hors limites : {result.final_score}"
 
     def test_shap_ranking_all_features_present(self):
-        from engines.fusion import fuse_scores, WEIGHTS
+        from engines.fusion import fuse_scores, ENGINE_DEFAULT_STATUS
 
         result = fuse_scores(score_texture=0.8, score_audio=0.3)
         feature_names = {r["feature"] for r in result.shap_ranking}
-        assert feature_names == set(WEIGHTS.keys())
+        # SHAP n'inclut que les composantes actives (audio disabled — Brief v3 §0.6)
+        active = {k for k, s in ENGINE_DEFAULT_STATUS.items() if s != "disabled"}
+        assert feature_names == active
+        assert "audio" not in feature_names
+        # audio est disabled → dans unvalidated_components (exclu du score)
+        assert "audio" in result.unvalidated_components
+        # les autres sont experimental → dans experimental_components
+        assert all(k in result.experimental_components for k in active)
 
     def test_shap_contributions_sum_to_100(self):
         from engines.fusion import fuse_scores
@@ -90,13 +97,15 @@ class TestFusionEngine:
         if THRESHOLD_AUTHENTIC <= result.final_score < THRESHOLD_DEEPFAKE:
             assert result.verdict == Verdict.undetermined
 
-    def test_model_metrics_present(self):
+    def test_model_metrics_none_until_validated(self):
         from engines.fusion import fuse_scores
 
         result = fuse_scores()
-        assert 0.0 < result.model_far < 0.1
-        assert 0.0 < result.model_frr < 0.1
-        assert 0.0 < result.model_auc <= 1.0
+        # Brief v2 P0.2 : métriques à None jusqu'à mesure sur jeu de test indépendant
+        assert result.model_far is None
+        assert result.model_frr is None
+        assert result.model_eer is None
+        assert result.model_auc is None
 
 
 class TestVideoEngineEdgeCases:

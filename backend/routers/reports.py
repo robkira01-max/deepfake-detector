@@ -12,6 +12,7 @@ from core.security import require_analyst, require_any
 from database import get_db
 from models.analysis import Analysis, AnalysisStatus
 from models.report import Report
+from models.responses import ANALYST_ERRORS, CRUD_ERRORS, HTTP_401
 from models.user import User
 
 router = APIRouter(prefix="/reports", tags=["Rapports"])
@@ -44,7 +45,8 @@ class GenerateReportRequest(BaseModel):
     "/generate/{analysis_id}",
     response_model=ReportResponse,
     status_code=201,
-    summary="Générer le rapport PDF/A-3 conforme R. c. Mohan",
+    summary="Générer le rapport PDF/A-3 (conçu pour soutenir l'admissibilité en preuve)",
+    responses=CRUD_ERRORS,
 )
 def generate_report(
     analysis_id: int,
@@ -95,6 +97,7 @@ def generate_report(
 @router.get(
     "/{report_id}/download",
     summary="Télécharger le rapport PDF",
+    responses=CRUD_ERRORS,
 )
 def download_report(
     report_id: int,
@@ -124,6 +127,7 @@ def download_report(
     "/case/{case_id}",
     response_model=list[ReportResponse],
     summary="Lister les rapports d'un dossier",
+    responses=HTTP_401,
 )
 def list_case_reports(
     case_id: int,
@@ -150,6 +154,66 @@ def list_case_reports(
         )
         for r in reports
     ]
+
+
+class CourtReportRequest(BaseModel):
+    expert_name: str | None = None
+    expert_title: str | None = None
+    expert_credentials: str | None = None
+    court_file_number: str | None = None
+    notes_for_court: str | None = None
+
+
+@router.post(
+    "/{analysis_id}/courtroom",
+    response_model=ReportResponse,
+    status_code=201,
+    summary="Générer le rapport judiciaire (Courtroom Mode) — XAI simplifié pour tribunal",
+    responses=CRUD_ERRORS,
+)
+def generate_courtroom(
+    analysis_id: int,
+    current_user: Annotated[User, Depends(require_analyst)],
+    db: Annotated[Session, Depends(get_db)],
+    body: CourtReportRequest = CourtReportRequest(),
+) -> ReportResponse:
+    analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analyse introuvable")
+    if analysis.status != AnalysisStatus.completed:
+        raise HTTPException(status_code=409, detail="L'analyse n'est pas encore terminée")
+
+    extra: dict[str, Any] = {}
+    if body.expert_name:
+        extra["expert_name"] = body.expert_name
+    if body.expert_title:
+        extra["expert_title"] = body.expert_title
+    if body.expert_credentials:
+        extra["expert_credentials"] = body.expert_credentials
+    if body.court_file_number:
+        extra["court_file_number"] = body.court_file_number
+    if body.notes_for_court:
+        extra["notes_for_court"] = body.notes_for_court
+
+    from reporting.pdf_generator import generate_courtroom_report
+    report = generate_courtroom_report(
+        analysis_id=analysis_id,
+        expert=current_user,
+        db=db,
+        extra_context=extra or None,
+    )
+
+    return ReportResponse(
+        id=report.id,
+        report_number=report.report_number,
+        case_id=report.case_id,
+        analysis_id=report.analysis_id,
+        is_signed=report.is_signed,
+        report_hash_sha256=report.report_hash_sha256,
+        tsa_timestamp=report.tsa_timestamp.isoformat() if report.tsa_timestamp else None,
+        expert_username=report.expert_username,
+        generated_at=report.generated_at.isoformat(),
+    )
 
 
 def _audit_download(db: Session, user: User, report: Report) -> None:

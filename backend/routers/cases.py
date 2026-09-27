@@ -13,6 +13,7 @@ from config import settings
 from core.security import get_current_user, require_analyst, require_any
 from database import get_db
 from models.case import Case, CaseStatus, Jurisdiction
+from models.responses import ANALYST_ERRORS, CRUD_ERRORS, HTTP_401
 from models.user import User, UserRole
 
 router = APIRouter(prefix="/cases", tags=["Dossiers"])
@@ -94,7 +95,7 @@ class CaseResponse(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=CaseResponse, status_code=201, summary="Créer un dossier")
+@router.post("/", response_model=CaseResponse, status_code=201, summary="Créer un dossier", responses=ANALYST_ERRORS)
 def create_case(
     body: CaseCreateRequest,
     current_user: Annotated[User, Depends(require_analyst)],
@@ -124,7 +125,7 @@ def create_case(
     return response
 
 
-@router.get("/", response_model=list[CaseResponse], summary="Lister les dossiers")
+@router.get("/", response_model=list[CaseResponse], summary="Lister les dossiers", responses=HTTP_401)
 def list_cases(
     current_user: Annotated[User, Depends(require_any)],
     db: Annotated[Session, Depends(get_db)],
@@ -145,7 +146,7 @@ def list_cases(
     return results
 
 
-@router.get("/{case_id}", response_model=CaseResponse, summary="Détail d'un dossier")
+@router.get("/{case_id}", response_model=CaseResponse, summary="Détail d'un dossier", responses=CRUD_ERRORS)
 def get_case(
     case_id: int,
     current_user: Annotated[User, Depends(require_any)],
@@ -157,7 +158,7 @@ def get_case(
     return r
 
 
-@router.patch("/{case_id}", response_model=CaseResponse, summary="Mettre à jour un dossier")
+@router.patch("/{case_id}", response_model=CaseResponse, summary="Mettre à jour un dossier", responses=CRUD_ERRORS)
 def update_case(
     case_id: int,
     body: CaseCreateRequest,
@@ -178,7 +179,7 @@ def update_case(
     return r
 
 
-@router.post("/{case_id}/archive", response_model=CaseResponse, summary="Archiver un dossier")
+@router.post("/{case_id}/archive", response_model=CaseResponse, summary="Archiver un dossier", responses=CRUD_ERRORS)
 def archive_case(
     case_id: int,
     current_user: Annotated[User, Depends(require_analyst)],

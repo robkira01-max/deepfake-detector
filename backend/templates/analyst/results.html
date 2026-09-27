@@ -1,0 +1,488 @@
+{% extends "analyst/base.html" %}
+{% block title %}Résultats — {{ media_file.original_filename }}{% endblock %}
+
+{% block content %}
+
+{# ── Helpers ── #}
+{% set is_deepfake     = analysis.final_score is not none and analysis.final_score >= 0.65 %}
+{% set is_authentic    = analysis.final_score is not none and analysis.final_score <= 0.35 %}
+{% set is_running      = analysis.status.value in ('pending', 'running') %}
+{% set is_failed       = analysis.status.value == 'failed' %}
+{% set verdict_class   = 'deepfake' if is_deepfake else ('authentic' if is_authentic else 'indeterminate') %}
+{% set score_pct       = ((analysis.final_score or 0) * 100)|round|int %}
+{% set accent_color    = '#ff4757' if is_deepfake else ('#00e676' if is_authentic else '#ffb700') %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ media_file.original_filename }}</div>
+    <div class="page-subtitle">
+      Dossier <span class="font-mono text-accent" style="font-size:11px">{{ case.case_number }}</span>
+      &bull; {{ media_file.media_type.value }}
+      &bull; Analyse #{{ analysis.id }}
+    </div>
+  </div>
+  <div class="d-flex gap-8">
+    <a href="/analyst/cases/{{ case.id }}" class="btn btn-ghost btn-sm">← Dossier</a>
+    {% if analysis.status.value == 'completed' %}
+    <a href="/reports/{{ case.id }}/{{ analysis.id }}" class="btn btn-primary btn-sm">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      Rapport PDF
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="page-body">
+
+  <!-- ════════════════════════════════════════════════════════════
+       RUNNING STATE — HTMX polling
+  ═══════════════════════════════════════════════════════════════ -->
+  {% if is_running %}
+  <div id="poll-zone"
+       hx-get="{% if analysis_type == 'document' %}/analyst/doc/{{ analysis.id }}/poll{% else %}/analyst/analyze/{{ analysis.id }}/poll{% endif %}"
+       hx-trigger="every 2s"
+       hx-swap="outerHTML">
+    <div class="card mb-20" style="border-color:rgba(79,172,254,.3)">
+      <div class="card-header" style="background:rgba(79,172,254,.05)">
+        <span class="card-title" style="color:var(--info)">
+          <span class="spinner"></span>
+          Analyse en cours…
+        </span>
+        <span class="badge badge-info">{{ analysis.status.value }}</span>
+      </div>
+      <div class="progress-steps">
+        {% set steps = [
+          ('Extraction des métadonnées', '🔍'),
+          ('Analyse texture visuelle (EfficientNet-B4)', '🎥'),
+          ('Cohérence temporelle (LSTM)', '⏱'),
+          ('Signal rPPG — pouls carotidien', '❤️'),
+          ('Biométrie faciale (MediaPipe)', '👤'),
+          ('Détection vocale (Wav2Vec2)', '🎵'),
+          ('Phase audio (STFT)', '〰'),
+          ('Fusion pondérée des moteurs IA', '🔮'),
+        ] %}
+        {% for label, icon in steps %}
+        <div class="step {% if loop.index == 1 %}active{% endif %}">
+          <div class="step-dot">{{ icon }}</div>
+          <div class="step-label">{{ label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div style="text-align:center;color:var(--text-muted);font-size:12px">
+      Cette page se rafraîchit automatiquement. Durée typique : 30–120 secondes.
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       FAILED STATE
+  ═══════════════════════════════════════════════════════════════ -->
+  {% elif is_failed %}
+  <div class="flash flash-error">
+    <strong>Analyse échouée</strong>
+    {% if analysis.error_message %} — {{ analysis.error_message }}{% endif %}
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       COMPLETED — FULL RESULTS (LE DIFFÉRENCIATEUR PRINCIPAL)
+  ═══════════════════════════════════════════════════════════════ -->
+  {% else %}
+
+  <!-- 1. VERDICT BANNER -->
+  <div class="verdict-banner {{ verdict_class }}">
+    <div class="verdict-header">
+      <div class="verdict-icon-wrap">
+        {% if is_deepfake %}
+          <svg width="32" height="32" fill="none" stroke="#ff4757" stroke-width="2.5" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+        {% elif is_authentic %}
+          <svg width="32" height="32" fill="none" stroke="#00e676" stroke-width="2.5" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <polyline points="9,12 11,14 15,10"/>
+          </svg>
+        {% else %}
+          <svg width="32" height="32" fill="none" stroke="#ffb700" stroke-width="2.5" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        {% endif %}
+      </div>
+
+      <div style="flex:1">
+        <div class="verdict-title">
+          {% if is_deepfake %}DEEPFAKE DÉTECTÉ{% elif is_authentic %}AUTHENTIQUE{% else %}RÉSULTAT INDÉTERMINÉ{% endif %}
+        </div>
+        <div class="verdict-meta">
+          {% if analysis.confidence_low is not none and analysis.confidence_high is not none %}
+          <span class="verdict-ci">
+            IC : {{ (analysis.confidence_low * 100)|round|int }}% – {{ (analysis.confidence_high * 100)|round|int }}%
+          </span>
+          {% endif %}
+          <span class="verdict-legal">
+            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            LPC art. 31.1-31.6 · R. c. Mohan [1994]
+          </span>
+          {% if analysis.duration_seconds %}
+          <span class="text-xs text-muted">{{ analysis.duration_seconds }}s d'analyse</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="verdict-score-big">{{ score_pct }}%</div>
+    </div>
+  </div>
+
+  <!-- 2. COMPRESSION WARNING (if applicable) -->
+  {% if compression and compression.degraded %}
+  <div class="compression-alert">
+    <div class="compression-icon">
+      <svg width="16" height="16" fill="none" stroke="#ffb700" stroke-width="2.5" viewBox="0 0 24 24">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    </div>
+    <div class="compression-text">
+      <h4>Compression vidéo détectée — Précision réduite</h4>
+      <p>
+        {{ compression.codec|upper }} · {{ compression.bitrate_kbps }} kbps · {{ compression.resolution }} · {{ compression.quality_flag }}
+        {% if compression.platform_hint %} · Source probable : {{ compression.platform_hint }}{% endif %}
+      </p>
+      {% if compression.source_warning %}
+      <p style="margin-top:6px">{{ compression.source_warning }}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 3. GAUGE + RADAR CHART -->
+  <div class="analysis-grid mb-20">
+
+    <!-- Gauge -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Score de manipulation</span></div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 200 115">
+          <defs>
+            <linearGradient id="gauge-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   stop-color="{{ '#00e676' if not is_deepfake else '#ff4757' }}" stop-opacity=".8"/>
+              <stop offset="100%" stop-color="{{ '#ff4757' if is_deepfake else ('#ffb700' if not is_authentic else '#00e676') }}"/>
+            </linearGradient>
+          </defs>
+          <!-- Background arc -->
+          <path d="M 15,100 A 85,85 0 0 1 185,100" fill="none" stroke="#1a2e47" stroke-width="16" stroke-linecap="round"/>
+          <!-- Score arc -->
+          <path id="gauge-arc" d="M 15,100 A 85,85 0 0 1 185,100" fill="none"
+                stroke="url(#gauge-grad)" stroke-width="16" stroke-linecap="round"
+                data-score="{{ (analysis.final_score or 0)|round(4) }}"/>
+          <!-- Tick marks -->
+          {% for pct in [0, 25, 50, 75, 100] %}
+            {% set angle = (pct / 100 * 180 - 180) * 3.14159 / 180 %}
+            {% set x1 = (100 + 73 * [1, -1][0] * (1 if pct > 0 else 1) * (1))|float %}
+          {% endfor %}
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-pct" id="gauge-pct" style="color:{{ accent_color }}">{{ score_pct }}%</div>
+          <div class="gauge-label">Score falsification</div>
+        </div>
+
+        <!-- Legend -->
+        <div style="display:flex;gap:20px;margin-top:8px">
+          <div style="text-align:center">
+            <div style="font-size:11px;color:var(--success)">0–35%</div>
+            <div style="font-size:10px;color:var(--text-dim)">Authentique</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:11px;color:var(--warning)">35–65%</div>
+            <div style="font-size:10px;color:var(--text-dim)">Indéterminé</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:11px;color:var(--danger)">65–100%</div>
+            <div style="font-size:10px;color:var(--text-dim)">Deepfake</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Radar Chart -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Profil des composantes IA</span></div>
+      <div class="radar-wrap">
+        <canvas id="radar-chart"
+          data-labels='{{ component_labels | tojson }}'
+          data-scores='{{ component_raw_scores | tojson }}'
+          data-color="{{ accent_color }}">
+        </canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 4. COMPONENT BREAKDOWN -->
+  <div class="card mb-20">
+    <div class="card-header">
+      <span class="card-title">Analyse par composante</span>
+      <span class="text-xs text-muted">7 moteurs indépendants — fusion pondérée</span>
+    </div>
+    <div class="card-body">
+      <div class="components-list">
+        {% for comp in components %}
+        {% set pct = (comp.score * 100)|round|int %}
+        {% set bar_class = 'bar-danger' if comp.score >= 0.65 else ('bar-warning' if comp.score >= 0.35 else 'bar-success') %}
+        <div class="component-item">
+          <div class="component-name">
+            <span>{{ comp.icon }}</span>
+            {{ comp.label }}
+          </div>
+          <div class="component-bar-track">
+            <div class="component-bar-fill score-bar-fill {{ bar_class }}"
+                 data-score="{{ comp.score }}"
+                 style="width:0%">
+            </div>
+          </div>
+          <div class="component-pct" style="color:{{ '#ff4757' if comp.score >= 0.65 else ('#ffb700' if comp.score >= 0.35 else '#00e676') }}">
+            {{ pct }}%
+          </div>
+          <div class="component-weight text-dim">[{{ comp.weight }}]</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. RELIABILITY METRICS -->
+  {% if analysis.model_far is not none %}
+  <div class="card mb-20">
+    <div class="card-header">
+      <span class="card-title">Métriques de fiabilité du modèle</span>
+      <span class="text-xs text-muted">Requis — R. c. Mohan [1994] 2 RCS 9</span>
+    </div>
+    <div class="card-body" style="padding:12px">
+      <div class="metrics-row">
+        <div class="metric-item">
+          <div class="metric-val">{{ ((analysis.model_far or 0) * 100)|round(1) }}%</div>
+          <div class="metric-lbl">FAR</div>
+          <div class="metric-hint">Taux fausse acceptation</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-val">{{ ((analysis.model_frr or 0) * 100)|round(1) }}%</div>
+          <div class="metric-lbl">FRR</div>
+          <div class="metric-hint">Taux fausse rejection</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-val">{{ ((analysis.model_eer or 0) * 100)|round(1) }}%</div>
+          <div class="metric-lbl">EER</div>
+          <div class="metric-hint">Taux égal d'erreur</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-val">{{ (analysis.model_auc or 0)|round(3) }}</div>
+          <div class="metric-lbl">AUC-ROC</div>
+          <div class="metric-hint">Aire sous la courbe</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 6. XAI EXPLANATION -->
+  {% if analysis.xai_plain_explanation %}
+  <div class="card mb-20">
+    <div class="card-header">
+      <span class="card-title">Explication intelligible (XAI)</span>
+      <span class="badge badge-accent">IA explicable</span>
+    </div>
+    <div class="card-body">
+      <div class="xai-box">
+        <div class="xai-text">{{ analysis.xai_plain_explanation }}</div>
+      </div>
+      {% if analysis.xai_suspicious_timecodes %}
+      <div class="mt-16">
+        <div class="form-label">Timecodes suspects</div>
+        <div class="xai-timecodes">
+          {% for tc in analysis.xai_suspicious_timecodes %}
+          <span class="timecode-chip">{{ tc }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 7. CHAIN OF CUSTODY -->
+  <div class="card mb-20">
+    <div class="card-header">
+      <span class="card-title">Chaîne de possession — Chain of Custody</span>
+      <span class="badge badge-success">
+        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
+        Intégrité vérifiée
+      </span>
+    </div>
+    <div class="card-body" style="padding:12px">
+      <div class="coc-grid">
+        <div class="coc-item">
+          <div class="coc-label">Fichier original</div>
+          <div class="coc-value">{{ media_file.original_filename }}</div>
+        </div>
+        <div class="coc-item">
+          <div class="coc-label">Taille</div>
+          <div class="coc-value">{{ (media_file.file_size_bytes / 1024 / 1024)|round(2) }} MB ({{ media_file.file_size_bytes }} octets)</div>
+        </div>
+        <div class="coc-item coc-wide">
+          <div class="coc-label">SHA-256</div>
+          <div class="coc-value accent">{{ media_file.hash_sha256 }}</div>
+        </div>
+        <div class="coc-item coc-wide">
+          <div class="coc-label">Blake3</div>
+          <div class="coc-value accent">{{ media_file.hash_blake3 }}</div>
+        </div>
+        <div class="coc-item">
+          <div class="coc-label">MD5</div>
+          <div class="coc-value">{{ media_file.hash_md5 }}</div>
+        </div>
+        <div class="coc-item">
+          <div class="coc-label">Type MIME</div>
+          <div class="coc-value">{{ media_file.mime_type }}</div>
+        </div>
+        {% if media_file.tsa_timestamp %}
+        <div class="coc-item">
+          <div class="coc-label">Horodatage TSA (RFC 3161)</div>
+          <div class="coc-value accent">{{ media_file.tsa_timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+        </div>
+        <div class="coc-item">
+          <div class="coc-label">Autorité TSA</div>
+          <div class="coc-value">{{ media_file.tsa_authority or 'FreeTSA.org' }}</div>
+        </div>
+        {% endif %}
+        <div class="coc-item">
+          <div class="coc-label">Ingestion</div>
+          <div class="coc-value">{{ media_file.ingested_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+        </div>
+        {% if analysis.completed_at %}
+        <div class="coc-item">
+          <div class="coc-label">Analyse complétée</div>
+          <div class="coc-value">{{ analysis.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}{% if analysis.duration_seconds %} ({{ analysis.duration_seconds }}s){% endif %}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. MODELS USED -->
+  {% if analysis.models_used %}
+  <div class="card mb-20">
+    <div class="card-header"><span class="card-title">Modèles IA utilisés</span></div>
+    <div class="card-body">
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        {% for k, v in analysis.models_used.items() %}
+        <span class="badge badge-neutral" style="font-family:var(--font-mono);font-size:10px">
+          {{ k }} : {{ v }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 8b. FEEDBACK ANALYSTE -->
+  {% if analysis.status.value == 'completed' %}
+  <div class="card mb-20" id="feedback-section">
+    <div class="card-header">
+      <span class="card-title">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/>
+          <path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+        </svg>
+        Validation du verdict
+      </span>
+      <span class="badge badge-neutral">Active Learning</span>
+    </div>
+    <div class="card-body">
+      <form method="post" action="/analyst/feedback/{{ analysis.id }}{% if analysis_type == 'document' %}?doc=1{% endif %}" id="feedback-form">
+        <div class="form-group">
+          <div class="form-label">Le verdict est-il correct ?</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px">
+              <input type="radio" name="feedback_type" value="correct" required style="accent-color:var(--success)">
+              <span style="color:var(--success);font-weight:600">✓ Correct</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px">
+              <input type="radio" name="feedback_type" value="incorrect" style="accent-color:var(--danger)">
+              <span style="color:var(--danger);font-weight:600">✗ Incorrect</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px">
+              <input type="radio" name="feedback_type" value="uncertain" style="accent-color:var(--warning)">
+              <span style="color:var(--warning);font-weight:600">? Incertain</span>
+            </label>
+          </div>
+        </div>
+        <div id="true-verdict-section" style="display:none">
+          <div class="form-group">
+            <label class="form-label" for="true_verdict">Verdict correct selon vous</label>
+            <select name="true_verdict" id="true_verdict" class="form-control" style="max-width:280px">
+              <option value="">— Sélectionner —</option>
+              <option value="authentic">Authentique</option>
+              <option value="deepfake">Deepfake</option>
+              <option value="indeterminate">Indéterminé</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="analyst_notes">Notes (optionnel)</label>
+          <textarea name="analyst_notes" id="analyst_notes" class="form-control" rows="2"
+            placeholder="Contexte, observations particulières…"></textarea>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Confiance (1–5)</div>
+          <div style="display:flex;gap:8px">
+            {% for i in range(1, 6) %}
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px">
+              <input type="radio" name="confidence_rating" value="{{ i }}" style="accent-color:var(--accent)">
+              {{ i }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Soumettre le feedback</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('input[name="feedback_type"]').forEach(function(el) {
+      el.addEventListener('change', function() {
+        var sec = document.getElementById('true-verdict-section');
+        sec.style.display = this.value === 'incorrect' ? 'block' : 'none';
+      });
+    });
+  </script>
+  {% endif %}
+
+  <!-- 9. ACTION BAR -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
+    <div class="text-sm text-muted">
+      Analyse #{{ analysis.id }} &bull; Dossier {{ case.case_number }} &bull; {{ analysis.started_at.strftime('%Y-%m-%d') }}
+    </div>
+    <div class="d-flex gap-8">
+      <a href="/analyst/cases/{{ case.id }}" class="btn btn-ghost btn-sm">← Retour au dossier</a>
+      <a href="/reports/{{ case.id }}/{{ analysis.id }}" class="btn btn-primary btn-sm">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
+        </svg>
+        Générer rapport PDF
+      </a>
+    </div>
+  </div>
+
+  {% endif %}{# end completed #}
+
+</div>
+{% endblock %}

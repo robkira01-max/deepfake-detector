@@ -1,0 +1,121 @@
+{% extends "admin/base.html" %}
+{% block title %}Utilisateurs{% endblock %}
+{% block page_title %}Gestion des utilisateurs{% endblock %}
+
+{% block content %}
+{% if flash %}
+<div class="alert alert-{{ flash.type }}">{{ flash.message }}</div>
+{% endif %}
+
+<div class="grid-2">
+  <!-- User list -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Utilisateurs ({{ users | length }})</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Utilisateur</th>
+            <th>Rôle</th>
+            <th>Statut</th>
+            <th>MFA</th>
+            <th>Connexion</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr>
+            <td>
+              <div style="font-weight:500">{{ user.username }}</div>
+              <div class="text-sm text-muted">{{ user.email }}</div>
+            </td>
+            <td>
+              {% if user.role.value == 'admin' %}
+                <span class="badge badge-danger">admin</span>
+              {% elif user.role.value == 'analyst' %}
+                <span class="badge badge-info">analyst</span>
+              {% else %}
+                <span class="badge badge-neutral">readonly</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if user.is_active %}
+                <span class="badge badge-success">actif</span>
+              {% else %}
+                <span class="badge badge-warning">inactif</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if user.mfa_enabled %}
+                <span class="badge badge-success">&#10003;</span>
+              {% else %}
+                <span class="badge badge-neutral">&#8212;</span>
+              {% endif %}
+            </td>
+            <td class="text-sm text-muted">
+              {{ user.last_login.strftime('%Y-%m-%d') if user.last_login else '—' }}
+            </td>
+            <td>
+              <div style="display:flex; gap:6px">
+                {% if user.id != current_user.id %}
+                <form method="post" action="/admin/users/{{ user.id }}/toggle" style="margin:0">
+                  <button type="submit" class="btn btn-sm btn-neutral"
+                          title="{{ 'Désactiver' if user.is_active else 'Activer' }}">
+                    {{ '&#10006;' if user.is_active else '&#10003;' }}
+                  </button>
+                </form>
+                <form method="post" action="/admin/users/{{ user.id }}/delete"
+                      onsubmit="return confirm('Supprimer {{ user.username }} ?')" style="margin:0">
+                  <button type="submit" class="btn btn-sm btn-danger" title="Supprimer">&#128465;</button>
+                </form>
+                {% else %}
+                <span class="text-sm text-muted">(vous)</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-muted" style="text-align:center; padding:24px">Aucun utilisateur</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Create user form -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Créer un utilisateur</span>
+    </div>
+    <form method="post" action="/admin/users">
+      <div class="form-group">
+        <label class="form-label" for="username">Nom d'utilisateur *</label>
+        <input class="form-input" type="text" id="username" name="username" required
+               minlength="3" maxlength="64" placeholder="analyste_01">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="email">Courriel *</label>
+        <input class="form-input" type="email" id="email" name="email" required
+               placeholder="analyste@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="role">Rôle *</label>
+        <select class="form-select" id="role" name="role">
+          <option value="readonly">readonly — lecture seule</option>
+          <option value="analyst">analyst — analyses + dossiers</option>
+          <option value="admin">admin — accès complet</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Mot de passe temporaire *</label>
+        <input class="form-input" type="password" id="password" name="password" required
+               minlength="10" placeholder="Min. 10 caractères">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%">Créer l'utilisateur</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

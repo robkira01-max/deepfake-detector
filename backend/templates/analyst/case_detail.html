@@ -1,0 +1,171 @@
+{% extends "analyst/base.html" %}
+{% block title %}Dossier {{ case.case_number }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ case.title }}</div>
+    <div class="page-subtitle">
+      <span class="font-mono text-accent" style="font-size:11px">{{ case.case_number }}</span>
+      &bull; {{ case.jurisdiction.value }}
+      &bull; Créé le {{ case.created_at.strftime('%Y-%m-%d') }}
+    </div>
+  </div>
+  <div class="d-flex gap-8">
+    {% if case.status.value == 'open' %}
+      <span class="badge badge-accent">Ouvert</span>
+    {% elif case.status.value == 'in_analysis' %}
+      <span class="badge badge-info">En analyse</span>
+    {% elif case.status.value == 'completed' %}
+      <span class="badge badge-success">Complété</span>
+    {% endif %}
+    <a href="/analyst/dashboard" class="btn btn-ghost btn-sm">← Dossiers</a>
+  </div>
+</div>
+
+<div class="page-body">
+
+  {% if flash %}
+  <div class="flash flash-{{ flash_type|default('info') }}">{{ flash }}</div>
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 360px;gap:24px">
+
+    <!-- Left: Files list -->
+    <div>
+      <div class="section-title">Fichiers médias ({{ files|length }})</div>
+
+      {% if files %}
+      <div class="file-list mb-20">
+        {% for f in files %}
+        {% set analysis = analyses.get(f.id) %}
+        <div class="file-item">
+          <div class="file-icon {{ f.media_type.value }}">
+            {% if f.media_type.value == 'video' %}
+              <svg width="18" height="18" fill="none" stroke="#4facfe" stroke-width="2" viewBox="0 0 24 24"><polygon points="23,7 16,12 23,17"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            {% elif f.media_type.value == 'audio' %}
+              <svg width="18" height="18" fill="none" stroke="#a18cd1" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            {% else %}
+              <svg width="18" height="18" fill="none" stroke="#ffb700" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            {% endif %}
+          </div>
+          <div class="file-info">
+            <div class="file-name">{{ f.original_filename }}</div>
+            <div class="file-meta">
+              {{ (f.file_size_bytes / 1024 / 1024)|round(1) }} MB
+              &bull; {{ f.media_type.value }}
+              &bull; {{ f.status.value }}
+              {% if f.tsa_timestamp %}
+              &bull; <span style="color:var(--accent-text)">✓ TSA</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="file-actions">
+            {% if analysis %}
+              {% if analysis.status.value == 'completed' %}
+                {% if analysis.__class__.__name__ == 'DocumentAnalysis' %}
+                  <span class="verdict-dot {{ 'deepfake' if analysis.final_score and analysis.final_score >= 0.65 else ('authentic' if analysis.final_score and analysis.final_score <= 0.35 else 'indeterminate') }}">
+                    {{ analysis.verdict_label or 'N/A' }}
+                  </span>
+                  <a href="/analyst/doc/{{ analysis.id }}" class="btn btn-secondary btn-sm">Résultats →</a>
+                {% else %}
+                  <span class="verdict-dot {{ 'deepfake' if analysis.verdict and 'DEEPFAKE' in analysis.verdict.value else ('authentic' if analysis.verdict and 'AUTHENTIQUE' in analysis.verdict.value else 'indeterminate') }}">
+                    {{ analysis.verdict.value if analysis.verdict else 'N/A' }}
+                  </span>
+                  <a href="/analyst/analyze/{{ analysis.id }}" class="btn btn-secondary btn-sm">Résultats →</a>
+                {% endif %}
+              {% elif analysis.status.value in ('pending', 'running') %}
+                <span class="badge badge-info pulse-ring">En cours…</span>
+                <a href="/analyst/analyze/{{ analysis.id }}" class="btn btn-ghost btn-sm">Suivi</a>
+              {% else %}
+                <span class="badge badge-danger">Échec</span>
+              {% endif %}
+            {% elif f.status.value == 'verified' %}
+              <form method="post" action="/analyst/cases/{{ case.id }}/analyze/{{ f.id }}">
+                <button type="submit" class="btn btn-primary btn-sm">
+                  ▶ Analyser
+                </button>
+              </form>
+            {% else %}
+              <span class="badge badge-warning">{{ f.status.value }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:32px">
+        <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <h3>Aucun fichier</h3>
+        <p>Déposez un fichier vidéo, audio ou document ci-contre.</p>
+      </div>
+      {% endif %}
+
+      <!-- Case info -->
+      {% if case.description or case.plaintiff or case.defendant %}
+      <div class="card mt-16">
+        <div class="card-header"><span class="card-title">Informations du dossier</span></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            {% if case.plaintiff %}
+            <div><div class="form-label">Demandeur</div><div class="text-sm">{{ case.plaintiff }}</div></div>
+            {% endif %}
+            {% if case.defendant %}
+            <div><div class="form-label">Défendeur</div><div class="text-sm">{{ case.defendant }}</div></div>
+            {% endif %}
+            {% if case.counsel %}
+            <div><div class="form-label">Avocat</div><div class="text-sm">{{ case.counsel }}</div></div>
+            {% endif %}
+          </div>
+          {% if case.description %}
+          <div class="mt-12"><div class="form-label">Description</div><div class="text-sm text-muted">{{ case.description }}</div></div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right: Upload -->
+    <div>
+      <div class="section-title">Déposer un fichier</div>
+      <div class="card">
+        <div class="card-body">
+          <form method="post" action="/analyst/cases/{{ case.id }}/upload" enctype="multipart/form-data">
+            <div id="upload-zone" class="drop-zone mb-16">
+              <div class="drop-icon">
+                <svg width="22" height="22" fill="none" stroke="#00cba4" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <div class="drop-title">Glisser-déposer</div>
+              <div class="drop-subtitle">ou cliquez pour sélectionner</div>
+              <input type="file" name="file" accept=".mp4,.mov,.avi,.mkv,.webm,.wav,.mp3,.aac,.flac,.ogg,.m4a,.pdf,.docx,.doc,.jpg,.jpeg,.png,.tiff" required>
+            </div>
+            <div class="form-hint mb-16">
+              <strong>Vidéo :</strong> mp4, mov, avi, mkv, webm<br>
+              <strong>Audio :</strong> wav, mp3, aac, flac, ogg, m4a<br>
+              <strong>Document :</strong> pdf, docx, jpg, png<br>
+              Taille max : {{ max_mb }} MB
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Déposer et vérifier
+            </button>
+          </form>
+          <div class="mt-12" style="padding:12px;background:var(--surface-2);border-radius:var(--radius-sm);border:1px solid var(--border)">
+            <div class="text-xs text-muted" style="line-height:1.6">
+              <strong style="color:var(--accent-text)">Chain of custody automatique</strong><br>
+              Chaque fichier reçoit : hash Blake3 + SHA-256 + MD5 et horodatage TSA RFC 3161.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

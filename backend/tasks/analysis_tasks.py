@@ -58,6 +58,7 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
     from engines.audio_engine import AudioEngine
     from engines.metadata_engine import MetadataEngine
     from engines.fusion import fuse_scores
+    from engines.compression_preprocess import detect_compression, apply_compression_penalty
     from models.audit_log import AuditLog, AuditAction
     from core.chain_of_custody import sign_audit_entry
 
@@ -76,6 +77,18 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
             raise ValueError(f"Fichier média #{media_file_id} introuvable ou sans chemin de stockage")
 
         file_path = Path(media_file.storage_key)
+
+        # ── Compression detection (Phase 2 v2.0) ─────────────────────────────
+        compression_profile = None
+        if media_file.media_type == MediaType.video:
+            compression_profile = detect_compression(file_path)
+            if compression_profile.degraded:
+                logger.warning(
+                    f"Compression dégradée détectée — "
+                    f"codec={compression_profile.codec} "
+                    f"bitrate={compression_profile.bitrate_kbps}kbps "
+                    f"qualité={compression_profile.quality_flag.value}"
+                )
 
         # ── Analyse vidéo ─────────────────────────────────────────────────────
         video_scores = None
@@ -108,13 +121,23 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
             score_metadata=score_metadata,
         )
 
+        # ── Ajustement compression (Phase 2 v2.0) ────────────────────────────
+        conf_low = result.confidence_low
+        conf_high = result.confidence_high
+        source_warning = None
+        if compression_profile and compression_profile.degraded:
+            conf_low, conf_high, _ = apply_compression_penalty(
+                conf_low, conf_high, result.final_score, compression_profile
+            )
+            source_warning = compression_profile.source_warning
+
         # ── Mise à jour Analysis ───────────────────────────────────────────────
         duration = int(time.time() - start_time)
         analysis.status = AnalysisStatus.completed
         analysis.verdict = result.verdict
         analysis.final_score = result.final_score
-        analysis.confidence_low = result.confidence_low
-        analysis.confidence_high = result.confidence_high
+        analysis.confidence_low = conf_low
+        analysis.confidence_high = conf_high
         analysis.score_video_texture = result.component_scores.get("texture")
         analysis.score_video_temporal = result.component_scores.get("temporal")
         analysis.score_rppg = result.component_scores.get("rppg")
@@ -133,10 +156,15 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
         )
         analysis.xai_heatmap_path = video_scores.heatmap_path if video_scores else None
         analysis.xai_spectrogram_path = audio_scores.spectrogram_path if audio_scores else None
-        analysis.models_used = (
-            {**(video_scores.models_used if video_scores else {}),
-             **(audio_scores.models_used if audio_scores else {})}
-        )
+        analysis.models_used = {
+            **(video_scores.models_used if video_scores else {}),
+            **(audio_scores.models_used if audio_scores else {}),
+            **({"compression": compression_profile.as_dict()} if compression_profile else {}),
+        }
+        # Stocker le warning compression dans l'explication XAI
+        if source_warning:
+            existing = analysis.xai_plain_explanation or ""
+            analysis.xai_plain_explanation = f"{source_warning}\n\n{existing}"
         analysis.duration_seconds = duration
         analysis.completed_at = datetime.now(timezone.utc)
         db.commit()
@@ -183,6 +211,140 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
         except Exception:
             pass
         self.retry(exc=exc, countdown=60)
+
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, name="analyze.run_document_analysis", max_retries=1)
+def run_document_analysis(self, doc_analysis_id: int, media_file_id: int) -> dict:
+    """Tâche d'analyse forensique de document (v2.0).
+
+    Pipeline :
+    1. Récupération du fichier
+    2. DocumentEngine (ELA + clone + métadonnées + polices)
+    3. TextEngine (via DocumentEngine si PDF/DOCX)
+    4. Persist résultat + audit log
+    """
+    logger.info(f"Démarrage analyse document #{doc_analysis_id} pour fichier #{media_file_id}")
+    start_time = time.time()
+
+    from database import SessionLocal
+    from models.analysis import AnalysisStatus, Verdict
+    from models.document_analysis import DocumentAnalysis
+    from models.media_file import MediaFile
+    from engines.document_engine import DocumentEngine
+    from engines.compression_preprocess import detect_compression, CompressionQuality
+    from models.audit_log import AuditLog, AuditAction
+    from core.chain_of_custody import sign_audit_entry
+
+    db = SessionLocal()
+    try:
+        doc = db.query(DocumentAnalysis).filter(DocumentAnalysis.id == doc_analysis_id).first()
+        if not doc:
+            logger.error(f"DocumentAnalysis #{doc_analysis_id} introuvable")
+            return {"error": "doc_analysis_not_found"}
+
+        doc.status = AnalysisStatus.running
+        doc.started_at = datetime.now(timezone.utc)
+        db.commit()
+
+        media_file = db.query(MediaFile).filter(MediaFile.id == media_file_id).first()
+        if not media_file or not media_file.storage_key:
+            raise ValueError(f"Fichier #{media_file_id} introuvable ou sans chemin de stockage")
+
+        file_path = Path(media_file.storage_key)
+
+        # ── Analyse document ──────────────────────────────────────────────────
+        engine = DocumentEngine()
+        result = engine.analyze(file_path)
+
+        # ── Verdict mapping ───────────────────────────────────────────────────
+        label = result.verdict_label
+        verdict_map = {
+            "DOCUMENT FALSIFIÉ": Verdict.deepfake,
+            "DOCUMENT AUTHENTIQUE": Verdict.authentic,
+            "INDÉTERMINÉ": Verdict.undetermined,
+        }
+        verdict = verdict_map.get(label, Verdict.undetermined)
+
+        # ── Explication lisible ───────────────────────────────────────────────
+        score = result.final_score
+        explanation_parts = [f"Verdict : {label} (score {score:.2f}/1.00)"]
+        if result.score_ela and result.score_ela > 0.5:
+            explanation_parts.append(f"• ELA : anomalies de retouche JPEG ({result.score_ela:.2f})")
+        if result.score_clone and result.score_clone > 0.3:
+            explanation_parts.append(f"• Clone : régions copy-move détectées ({result.score_clone:.2f})")
+        if result.score_metadata and result.score_metadata > 0.3:
+            explanation_parts.append(f"• Métadonnées : incohérences ({result.score_metadata:.2f})")
+        if result.score_font and result.score_font > 0.3:
+            explanation_parts.append(f"• Polices : mélange typographique ({result.score_font:.2f})")
+        if result.score_text_ai and result.score_text_ai > 0.5:
+            explanation_parts.append(f"• Texte : rédaction IA probable ({result.score_text_ai:.2f})")
+
+        # ── Mise à jour DocumentAnalysis ──────────────────────────────────────
+        duration = int(time.time() - start_time)
+        doc.status = AnalysisStatus.completed
+        doc.verdict = verdict
+        doc.verdict_label = label
+        doc.final_score = result.final_score
+        doc.score_ela = result.score_ela
+        doc.score_clone = result.score_clone
+        doc.score_metadata_doc = result.score_metadata
+        doc.score_font = result.score_font
+        doc.score_text_ai = result.score_text_ai
+        doc.anomalies = {"anomalies": result.anomalies}
+        doc.xai_plain_explanation = "\n".join(explanation_parts)
+        doc.text_preview = result.text_content_preview
+        doc.models_used = result.models_used
+        doc.completed_at = datetime.now(timezone.utc)
+        doc.duration_seconds = duration
+        if result.error:
+            doc.error_message = result.error
+        db.commit()
+
+        # ── Audit ─────────────────────────────────────────────────────────────
+        data = {
+            "action": AuditAction.DOCUMENT_ANALYSIS_COMPLETED.value,
+            "doc_analysis_id": doc_analysis_id,
+            "verdict_label": label,
+            "final_score": result.final_score,
+            "duration_seconds": duration,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        entry_hash, sig = sign_audit_entry(data)
+        log_entry = AuditLog(
+            action=AuditAction.DOCUMENT_ANALYSIS_COMPLETED,
+            resource_type="DocumentAnalysis",
+            resource_id=str(doc_analysis_id),
+            details=data,
+            entry_hash=entry_hash,
+            signature_b64=sig,
+        )
+        db.add(log_entry)
+        db.commit()
+
+        logger.info(
+            f"Analyse document #{doc_analysis_id} terminée — "
+            f"verdict={label} score={result.final_score:.3f} durée={duration}s"
+        )
+        return {
+            "doc_analysis_id": doc_analysis_id,
+            "verdict_label": label,
+            "final_score": result.final_score,
+            "duration_seconds": duration,
+        }
+
+    except Exception as exc:
+        logger.error(f"Erreur analyse document #{doc_analysis_id} : {exc}", exc_info=True)
+        try:
+            doc.status = AnalysisStatus.failed
+            doc.error_message = str(exc)
+            doc.completed_at = datetime.now(timezone.utc)
+            db.commit()
+        except Exception:
+            pass
+        self.retry(exc=exc, countdown=30)
 
     finally:
         db.close()

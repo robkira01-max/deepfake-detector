@@ -285,24 +285,32 @@ class TestUploadTemplate:
 # ── Tests lockout par username ──────────────────────────────────────────────────
 
 class TestLoginLockout:
+    @staticmethod
+    def _reset_lockout(username: str) -> None:
+        """Efface le compteur de lockout en mémoire ET dans Redis."""
+        import routers.auth as auth_router
+        auth_router._login_failures.pop(username, None)
+        r = auth_router._get_lockout_redis()
+        if r is not None:
+            r.delete(f"login:fail:{username}")
+
     def test_lockout_after_5_failures(self, client, db):
         """5 échecs consécutifs → 429 au 6ème essai."""
-        import routers.auth as auth_router
-        # Reset le compteur pour ce test
-        auth_router._login_failures.clear()
-
         username = "lockout_test_user"
+        self._reset_lockout(username)
+
         for _ in range(5):
             client.post("/auth/token", data={"username": username, "password": "wrong"})
 
         resp = client.post("/auth/token", data={"username": username, "password": "wrong"})
         assert resp.status_code == 429
         assert "Retry-After" in resp.headers
+        self._reset_lockout(username)  # cleanup
 
     def test_lockout_cleared_on_success(self, client, db, admin_user):
         """Succès de login → compteur réinitialisé."""
         import routers.auth as auth_router
-        auth_router._login_failures.clear()
+        self._reset_lockout(admin_user.username)
 
         # 3 échecs
         for _ in range(3):
@@ -314,21 +322,27 @@ class TestLoginLockout:
             data={"username": admin_user.username, "password": "Test1234!"},
         )
         assert resp.status_code == 200
-        # Le compteur est nettoyé
-        assert admin_user.username not in auth_router._login_failures or \
-               len(auth_router._login_failures[admin_user.username]) == 0
+        # Le compteur est nettoyé — vérifie in-memory et Redis
+        r = auth_router._get_lockout_redis()
+        if r is not None:
+            assert r.get(f"login:fail:{admin_user.username}") in (None, "0")
+        else:
+            assert admin_user.username not in auth_router._login_failures or \
+                   len(auth_router._login_failures[admin_user.username]) == 0
 
     def test_check_lockout_raises_429(self):
-        """_check_lockout lève 429 si le compteur dépasse le seuil."""
+        """_check_lockout lève 429 si le compteur dépasse le seuil — chemin in-memory."""
         import routers.auth as auth_router
         from fastapi import HTTPException
-        auth_router._login_failures.clear()
+        from unittest.mock import patch
 
         username = "direct_lockout_test"
-        # Injecter directement 5 tentatives récentes
+        auth_router._login_failures.clear()
         now = time.monotonic()
         auth_router._login_failures[username] = [now - i for i in range(5)]
 
-        with pytest.raises(HTTPException) as exc_info:
-            auth_router._check_lockout(username)
+        # Patch Redis à None pour tester le chemin in-memory directement
+        with patch.object(auth_router, "_get_lockout_redis", return_value=None):
+            with pytest.raises(HTTPException) as exc_info:
+                auth_router._check_lockout(username)
         assert exc_info.value.status_code == 429

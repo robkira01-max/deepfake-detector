@@ -1,4 +1,4 @@
-"""Chaîne de possession numérique — LPC art. 31.1-31.6 + CAN/DGSI 120.
+"""Chaîne de possession numérique — LPC art. 31.1-31.6 + CAN/DGSI 120 [À VALIDER].
 
 Responsabilités :
   - Calcul d'empreintes SHA-256, BLAKE3, MD5

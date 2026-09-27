@@ -1,0 +1,82 @@
+{% extends "analyst/base.html" %}
+{% set active_page = "new-case" %}
+{% block title %}Nouveau dossier{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Nouveau dossier judiciaire</div>
+    <div class="page-subtitle">Créez un dossier pour regrouper les fichiers médias à analyser</div>
+  </div>
+  <a href="/analyst/dashboard" class="btn btn-ghost">← Retour</a>
+</div>
+
+<div class="page-body" style="max-width:680px">
+  {% if error %}
+  <div class="flash flash-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Informations du dossier</span>
+    </div>
+    <div class="card-body">
+      <form method="post" action="/analyst/cases/new">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Numéro de dossier *</label>
+            <input name="case_number" type="text" class="form-control" placeholder="2026-QC-00123" required>
+            <div class="form-hint">Référence unique — numéro de tribunal ou interne</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Juridiction *</label>
+            <select name="jurisdiction" class="form-control" required>
+              <option value="federal">Fédéral</option>
+              <option value="ontario">Ontario</option>
+              <option value="quebec">Québec</option>
+              <option value="british_columbia">Colombie-Britannique</option>
+              <option value="alberta">Alberta</option>
+              <option value="other">Autre</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Titre du dossier *</label>
+          <input name="title" type="text" class="form-control" placeholder="Ex. : Fraude identitaire — Vidéo témoignage contesté" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="Contexte de l'affaire, nature des preuves, demandeur..."></textarea>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Partie demanderesse</label>
+            <input name="plaintiff" type="text" class="form-control" placeholder="Nom ou entité">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Défendeur</label>
+            <input name="defendant" type="text" class="form-control" placeholder="Nom ou entité">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Avocat responsable</label>
+          <input name="counsel" type="text" class="form-control" placeholder="Me Prénom Nom, Barreau du Québec">
+        </div>
+
+        <hr class="divider">
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Créer le dossier
+          </button>
+          <a href="/analyst/dashboard" class="btn btn-ghost">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

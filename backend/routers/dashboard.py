@@ -19,6 +19,7 @@ from models.audit_log import AuditLog, AuditAction
 from models.case import Case, CaseStatus
 from models.media_file import MediaFile
 from models.report import Report
+from models.responses import ADMIN_ERRORS, HTTP_401
 from models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -121,7 +122,7 @@ class HealthDetailedResponse(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.get("/stats", response_model=StatsResponse, summary="Statistiques globales")
+@router.get("/stats", response_model=StatsResponse, summary="Statistiques globales", responses=HTTP_401)
 def get_stats(
     _: Annotated[User, Depends(require_any)],
     db: Annotated[Session, Depends(get_db)],
@@ -185,6 +186,7 @@ def get_stats(
     "/audit-log",
     response_model=list[AuditLogEntry],
     summary="Journal d'audit (admin)",
+    responses=ADMIN_ERRORS,
 )
 def get_audit_log(
     _: Annotated[User, Depends(require_admin)],
@@ -206,6 +208,7 @@ def get_audit_log(
     "/health/detailed",
     response_model=HealthDetailedResponse,
     summary="Santé détaillée des composants",
+    responses=HTTP_401,
 )
 def get_health_detailed(
     _: Annotated[User, Depends(require_any)],

@@ -5,7 +5,7 @@
 API forensique de détection de deepfake (vidéo + audio) pour le marché canadien.
 Contraintes légales : LPRPDE, preuve numérique, chain of custody RFC3161.
 
-**Statut** : v1.0.0 — Démo active sur http://127.0.0.1:8080
+**Statut** : v3.1.0 — Démo active sur http://127.0.0.1:8082
 
 ## Stack technique
 

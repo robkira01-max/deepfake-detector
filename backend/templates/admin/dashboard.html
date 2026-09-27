@@ -1,0 +1,142 @@
+{% extends "admin/base.html" %}
+{% block title %}Tableau de bord{% endblock %}
+{% block page_title %}Vue d'ensemble{% endblock %}
+
+{% block content %}
+<!-- Stats cards -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Dossiers</div>
+    <div class="stat-value">{{ stats.total_cases }}</div>
+    <div class="stat-sub">
+      {{ stats.cases_by_status.get('open', 0) }} ouverts
+      &middot; {{ stats.cases_by_status.get('closed', 0) }} fermés
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-label">Analyses</div>
+    <div class="stat-value accent">{{ stats.total_analyses }}</div>
+    <div class="stat-sub">{{ stats.analyses_last_7_days }} ces 7 derniers jours</div>
+  </div>
+
+  <div class="stat-card deepfake">
+    <div class="stat-label">Taux deepfake</div>
+    <div class="stat-value">{{ "%.1f"|format(stats.deepfake_rate * 100) }}%</div>
+    <div class="stat-sub">{{ stats.analyses_by_verdict.get('DEEPFAKE DÉTECTÉ', 0) }} positifs détectés</div>
+  </div>
+
+  <div class="stat-card authentic">
+    <div class="stat-label">Confiance moy.</div>
+    <div class="stat-value">{{ "%.0f"|format(stats.avg_confidence * 100) }}%</div>
+    <div class="stat-sub">Sur toutes les analyses complétées</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-label">Fichiers médias</div>
+    <div class="stat-value">{{ stats.total_media_files }}</div>
+    <div class="stat-sub">Ingérés avec chaîne de possession</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-label">Rapports PDF</div>
+    <div class="stat-value">{{ stats.total_reports }}</div>
+    <div class="stat-sub">Signés RSA-4096 + TSA RFC3161</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Verdicts breakdown -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Répartition des verdicts</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Verdict</th>
+          <th>Nombre</th>
+          <th>Part</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for verdict, count in stats.analyses_by_verdict.items() %}
+        {% set total = stats.total_analyses if stats.total_analyses > 0 else 1 %}
+        <tr>
+          <td>
+            {% if 'DEEPFAKE' in verdict %}
+              <span class="verdict-deepfake">{{ verdict }}</span>
+            {% elif 'AUTHENTIQUE' in verdict %}
+              <span class="verdict-authentic">{{ verdict }}</span>
+            {% else %}
+              <span class="verdict-uncertain">{{ verdict }}</span>
+            {% endif %}
+          </td>
+          <td>{{ count }}</td>
+          <td class="text-muted">{{ "%.1f"|format(count / total * 100) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Cases by status -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Dossiers par statut</span>
+      <a href="/admin/cases" class="btn btn-ghost btn-sm">Voir tous</a>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Statut</th><th>Nombre</th></tr>
+      </thead>
+      <tbody>
+        {% for status, count in stats.cases_by_status.items() %}
+        <tr>
+          <td>
+            {% if status == 'open' %}
+              <span class="badge badge-info">{{ status }}</span>
+            {% elif status == 'closed' %}
+              <span class="badge badge-neutral">{{ status }}</span>
+            {% else %}
+              <span class="badge badge-warning">{{ status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border)">
+      <p class="text-sm text-muted">
+        Généré le {{ stats.generated_at.strftime('%Y-%m-%d %H:%M UTC') }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Quick nav -->
+<div class="stats-grid mt-4" style="grid-template-columns: repeat(4, 1fr)">
+  <a href="/admin/users" class="card" style="text-decoration:none; text-align:center; cursor:pointer">
+    <div style="font-size:24px; margin-bottom:8px">&#128100;</div>
+    <div class="stat-label">Utilisateurs</div>
+    <div style="color:var(--accent); font-weight:600; margin-top:4px">Gérer</div>
+  </a>
+  <a href="/admin/cases" class="card" style="text-decoration:none; text-align:center; cursor:pointer">
+    <div style="font-size:24px; margin-bottom:8px">&#128194;</div>
+    <div class="stat-label">Dossiers</div>
+    <div style="color:var(--accent); font-weight:600; margin-top:4px">Consulter</div>
+  </a>
+  <a href="/admin/audit" class="card" style="text-decoration:none; text-align:center; cursor:pointer">
+    <div style="font-size:24px; margin-bottom:8px">&#128203;</div>
+    <div class="stat-label">Audit</div>
+    <div style="color:var(--accent); font-weight:600; margin-top:4px">Journal</div>
+  </a>
+  <a href="/admin/health" class="card" style="text-decoration:none; text-align:center; cursor:pointer">
+    <div style="font-size:24px; margin-bottom:8px">&#9881;</div>
+    <div class="stat-label">Santé</div>
+    <div style="color:var(--accent); font-weight:600; margin-top:4px">Infrastructure</div>
+  </a>
+</div>
+{% endblock %}
