@@ -39,7 +39,10 @@ models/cache/
 
 # Ruflo / agents
 .agents/
-.claude/
+.claude/*
+!.claude/agents/
+!.claude/commands/
+!.claude/skills/
 skills-lock.json
 backend/.agents/
 backend/.claude/
