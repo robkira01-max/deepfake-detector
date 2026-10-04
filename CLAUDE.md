@@ -12,7 +12,7 @@ de manipulation.
 2. **Assurance / KYC** : chaîne de possession + hébergement canadien + rapport bilingue
 3. **Élections (C-25)** : la loi crée une infraction, pas un marché de détection — faible priorité commerciale
 
-**Statut** : v3.2.0 — 693 tests, 0 régression · ⏸ EN PAUSE — reprise 2026-10-04
+**Statut** : v3.2.0 — 718 tests, 0 régression · ⏸ EN PAUSE — reprise 2026-10-04
 
 ---
 
@@ -257,7 +257,7 @@ docker-compose up
 | Priorité | Action |
 |----------|--------|
 | 1 | ✅ 2026-10-04 Architecture de greffons — `EnginePlugin` ABC, `PluginRegistry`, `fuse_from_registry()`, `Verdict.abstain`. 38 tests. |
-| 2 | Vérification C2PA / Content Credentials (preuve non basée sur la détection) |
+| 2 | ✅ 2026-10-04 Vérification C2PA / Content Credentials — `C2PAVerifier`, `C2PAEngine`, `GET /c2pa/verify/{id}`, migration 0005, 25 tests. |
 | 3 | Valider un premier moteur selon la Règle 10, jeu en conditions réelles + robustesse compression |
 | 4 | Revoir legal_references.yaml : C-25 (état Parlement), retirer DGSI 120 du judiciaire, ajouter LPC art. 31.1, juriste québécois pour CPCivQ |
 | 5 | Audit licences datasets et modèles pour usage commercial |

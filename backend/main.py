@@ -20,6 +20,8 @@ from database import init_db
 from routers import auth, cases, analyze, dashboard, reports, templates as templates_router
 from routers import admin_ui, document as document_router, analyst_ui
 from routers import models as models_router, feedback as feedback_router, kyc as kyc_router
+from routers import export as export_router, webhooks as webhooks_router, analytics as analytics_router
+from routers import c2pa as c2pa_router
 
 log = structlog.get_logger(__name__)
 
@@ -29,11 +31,30 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("startup", app=settings.app_name, version=settings.app_version, env=settings.app_env)
+    _validate_production_config()
     init_db()
     _ensure_keys()
     _seed_templates()
     yield
     log.info("shutdown", app=settings.app_name)
+
+
+def _validate_production_config() -> None:
+    """Refuse de démarrer en production si la config est non sécurisée (CLAUDE.md Règle 4)."""
+    if settings.app_env != "production":
+        return
+    errors: list[str] = []
+    if settings.debug:
+        errors.append("DEBUG=true interdit en production")
+    if not settings.mfa_required:
+        errors.append("MFA_REQUIRED=false interdit en production")
+    if not settings.encryption_key:
+        errors.append("ENCRYPTION_KEY absent — chiffrement at-rest désactivé en production")
+    if errors:
+        raise RuntimeError(
+            "Configuration de production invalide — démarrage refusé :\n"
+            + "\n".join(f"  • {e}" for e in errors)
+        )
 
 
 def _ensure_keys() -> None:
@@ -298,6 +319,10 @@ app.include_router(templates_router.router)
 app.include_router(models_router.router)
 app.include_router(feedback_router.router)
 app.include_router(kyc_router.router)
+app.include_router(export_router.router)
+app.include_router(webhooks_router.router)
+app.include_router(analytics_router.router)
+app.include_router(c2pa_router.router)
 
 
 @app.get("/health", tags=["Système"])

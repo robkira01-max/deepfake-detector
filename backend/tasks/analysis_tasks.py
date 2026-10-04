@@ -35,6 +35,35 @@ celery_app.conf.update(
 logger = get_task_logger(__name__)
 
 
+def _dispatch_webhooks(db, event: str, payload: dict) -> None:
+    """Crée les WebhookDelivery et lance la livraison pour tous les hooks abonnés à cet événement."""
+    try:
+        from models.webhook import Webhook, WebhookDelivery, WebhookStatus
+        from core.webhook_dispatcher import dispatch_webhook_sync
+
+        hooks = db.query(Webhook).filter(
+            Webhook.active == True  # noqa: E712
+        ).all()
+        for hook in hooks:
+            if event not in (hook.events or []):
+                continue
+            delivery = WebhookDelivery(
+                webhook_id=hook.id,
+                event=event,
+                payload=payload,
+                status=WebhookStatus.pending,
+            )
+            db.add(delivery)
+            db.commit()
+            db.refresh(delivery)
+            try:
+                dispatch_webhook_sync(delivery.id)
+            except Exception as exc:
+                logger.warning(f"Webhook delivery #{delivery.id} erreur: {exc}")
+    except Exception as exc:
+        logger.warning(f"_dispatch_webhooks failed: {exc}")
+
+
 @celery_app.task(bind=True, name="analyze.run_deepfake_analysis", max_retries=2)
 def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
     """
@@ -110,6 +139,21 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
         metadata_result = metadata_engine.analyze(file_path)
         score_metadata = metadata_result.score if metadata_result.error is None else 0.0
 
+        # ── Vérification C2PA (provenance cryptographique — non ML) ──────────
+        c2pa_result_dict = None
+        try:
+            from core.c2pa_verifier import C2PAVerifier
+            c2pa_result = C2PAVerifier.verify(file_path)
+            c2pa_result_dict = c2pa_result.to_dict()
+            logger.info(
+                "c2pa_verified",
+                has_manifest=c2pa_result.has_manifest,
+                is_valid=c2pa_result.is_cryptographically_valid,
+                is_ai_generated=c2pa_result.is_ai_generated,
+            )
+        except Exception as exc:
+            logger.warning("c2pa_verification_failed", error=str(exc))
+
         # ── Fusion ────────────────────────────────────────────────────────────
         result = fuse_scores(
             score_texture=video_scores.score_texture if video_scores else 0.0,
@@ -165,6 +209,7 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
         if source_warning:
             existing = analysis.xai_plain_explanation or ""
             analysis.xai_plain_explanation = f"{source_warning}\n\n{existing}"
+        analysis.c2pa_result = c2pa_result_dict
         analysis.duration_seconds = duration
         analysis.completed_at = datetime.now(timezone.utc)
         db.commit()
@@ -190,6 +235,17 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
         db.add(log_entry)
         db.commit()
 
+        # ── Dispatch webhooks (analysis.completed) ────────────────────────────
+        _dispatch_webhooks(db, "analysis.completed", {
+            "event": "analysis.completed",
+            "analysis_id": analysis_id,
+            "case_id": analysis.case_id,
+            "verdict": result.verdict.value,
+            "final_score": result.final_score,
+            "duration_seconds": duration,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
         logger.info(
             f"Analyse #{analysis_id} terminée — verdict={result.verdict.value} "
             f"score={result.final_score:.3f} durée={duration}s"
@@ -208,6 +264,12 @@ def run_deepfake_analysis(self, analysis_id: int, media_file_id: int) -> dict:
             analysis.error_message = str(exc)
             analysis.completed_at = datetime.now(timezone.utc)
             db.commit()
+            _dispatch_webhooks(db, "analysis.failed", {
+                "event": "analysis.failed",
+                "analysis_id": analysis_id,
+                "error": str(exc)[:256],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
         except Exception:
             pass
         self.retry(exc=exc, countdown=60)

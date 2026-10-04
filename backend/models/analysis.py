@@ -70,6 +70,9 @@ class Analysis(Base):
     xai_suspicious_timecodes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     xai_plain_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Provenance C2PA (vérification déterministe — pas de détection ML)
+    c2pa_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     # Erreur éventuelle
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
