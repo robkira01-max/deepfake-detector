@@ -1,0 +1,203 @@
+schema_version: "1.0"
+registry_date: "2026-10-04"
+status: "audit_licences_complete"
+
+description: >
+  Inventaire et licences des jeux de données utilisés pour l'entraînement,
+  la validation et les tests des moteurs deepfake.
+  RÈGLE : aucun dataset dont la licence est non_commercial_uniquement ne peut être
+  utilisé en production commerciale sans accord écrit préalable avec le détenteur.
+
+datasets:
+
+  - id: faceforensics_pp
+    nom: "FaceForensics++"
+    source: "Technical University of Munich (TUM)"
+    url: "https://github.com/ondyari/FaceForensics"
+    usage_prevu: "Entraînement et évaluation des moteurs vidéo (texture, temporal)"
+    licence: "CC BY-NC 4.0"
+    usage_commercial: false
+    statut_licence: "non_commercial_uniquement"
+    notes: >
+      Licence CC BY-NC 4.0 confirmée. Usage non commercial uniquement.
+      Contacter les auteurs TUM pour une licence commerciale.
+      Vérifier les conditions d'accès sur le dépôt GitHub avant téléchargement.
+    date_verification: "2026-10-04"
+    hash_sha256: null
+    n_samples: null
+    acquis: false
+
+  - id: dfdc
+    nom: "DeepFake Detection Challenge (DFDC)"
+    source: "Meta AI (Facebook)"
+    url: "https://ai.meta.com/datasets/dfdc/"
+    usage_prevu: "Entraînement et évaluation des moteurs vidéo"
+    licence: "Non-commercial research license (Meta)"
+    usage_commercial: false
+    statut_licence: "non_commercial_uniquement"
+    notes: >
+      Licence de recherche non commerciale Meta confirmée. 128 154 clips vidéo,
+      3 426 acteurs rémunérés. Usage commercial non autorisé.
+      Téléchargement depuis ai.meta.com/datasets/dfdc uniquement.
+    date_verification: "2026-10-04"
+    hash_sha256: null
+    n_samples: 128154
+    acquis: false
+
+  - id: asvspoof_2019
+    nom: "ASVspoof 2019"
+    source: "ASVspoof Challenge Consortium (AIST, Nagoya U, etc.)"
+    url: "https://datashare.ed.ac.uk/handle/10283/3336"
+    usage_prevu: "Entraînement et évaluation du moteur audio (Wav2Vec2 — actuellement disabled)"
+    licence: "CC BY-NC-ND 4.0"
+    usage_commercial: false
+    statut_licence: "non_commercial_uniquement"
+    notes: >
+      Licence CC BY-NC-ND 4.0 confirmée (no derivatives, non commercial).
+      Applicable à la version 2019. Vérifier la version 2021/2024 séparément —
+      certaines éditions utilisent Open Data Commons Attribution (plus permissif).
+      Contacter les organisateurs pour une licence commerciale.
+    date_verification: "2026-10-04"
+    hash_sha256: null
+    n_samples: null
+    acquis: false
+
+  - id: insightface_buffalo_s
+    nom: "InsightFace buffalo_s (modèle pré-entraîné)"
+    source: "deepinsight / InsightFace"
+    url: "https://github.com/deepinsight/insightface"
+    usage_prevu: "Module KYC — authentification biométrique uniquement (pas de forensique judiciaire)"
+    licence_code: "MIT"
+    licence_modeles: "Non-commercial research (modèles pré-entraînés)"
+    usage_commercial: false
+    statut_licence: "non_commercial_uniquement"
+    notes: >
+      DISTINCTION IMPORTANTE : le code source est MIT (usage commercial libre).
+      Les poids des modèles pré-entraînés (buffalo_s, buffalo_l, etc.) sont
+      réservés à la recherche non commerciale. Contact pour licence commerciale :
+      recognition-oss-pack@insightface.ai
+      Conforme uniquement au module KYC (authentification biométrique).
+      Voir legal_references.yaml CAN-DGSI-120 (usage: kyc) pour le contexte normatif.
+    date_verification: "2026-10-04"
+    hash_sha256: null
+    acquis: false
+
+
+model_weights:
+
+  - id: efficientnet_b4_imagenet
+    nom: "EfficientNet-B4 — poids ImageNet (torchvision)"
+    source: "PyTorch / torchvision"
+    url: "https://pytorch.org/vision/stable/models/efficientnet.html"
+    usage_prevu: "Moteur texture (engine/video_engine.py) — backbone classification"
+    licence: "BSD 3-Clause"
+    usage_commercial: true
+    statut_licence: "libre"
+    notes: >
+      Poids EfficientNet-B4 ImageNet depuis torchvision.models. Licence BSD 3-Clause.
+      Ces poids sont des poids ImageNet génériques — ils ne sont PAS fine-tunés sur des
+      deepfakes. Le moteur est donc 'experimental'. Aucune restriction commerciale sur
+      les poids de base, mais fine-tuning sur FaceForensics++ (CC BY-NC) serait restreint.
+    date_verification: "2026-10-04"
+
+  - id: resnet50_imagenet
+    nom: "ResNet-50 — poids ImageNet (torchvision)"
+    source: "PyTorch / torchvision"
+    url: "https://pytorch.org/vision/stable/models/resnet.html"
+    usage_prevu: "Moteur temporal (engine/video_engine.py) — backbone séquences"
+    licence: "BSD 3-Clause"
+    usage_commercial: true
+    statut_licence: "libre"
+    notes: >
+      Poids ImageNet depuis torchvision.models. BSD 3-Clause. Aucune restriction commerciale.
+      Même remarque que EfficientNet-B4 : non fine-tuné sur deepfakes, moteur 'experimental'.
+    date_verification: "2026-10-04"
+
+  - id: wav2vec2_base
+    nom: "facebook/wav2vec2-base (HuggingFace)"
+    source: "Meta AI / Facebook"
+    url: "https://huggingface.co/facebook/wav2vec2-base"
+    usage_prevu: "Moteur audio (engine/audio_engine.py) — actuellement disabled (tête aléatoire)"
+    licence: "Apache 2.0"
+    usage_commercial: true
+    statut_licence: "libre"
+    notes: >
+      Poids Wav2Vec2-base depuis HuggingFace (Apache 2.0). Usage commercial autorisé.
+      ATTENTION : la tête de classification deepfake est aléatoire — moteur disabled.
+      Fine-tuning nécessaire sur ASVspoof 2019 (CC BY-NC-ND 4.0, non commercial).
+      Si fine-tuné sur ASVspoof, les poids résultants héritent de la restriction non commerciale.
+    date_verification: "2026-10-04"
+
+  - id: mediapipe_face_mesh
+    nom: "MediaPipe FaceMesh"
+    source: "Google LLC"
+    url: "https://github.com/google-ai-edge/mediapipe"
+    usage_prevu: "Moteur biométrie (engine/biometric_engine.py) — landmarks faciaux"
+    licence: "Apache 2.0"
+    usage_commercial: true
+    statut_licence: "libre"
+    notes: >
+      Apache 2.0. Usage commercial explicitement autorisé.
+      Les modèles TFLite inclus dans MediaPipe sont également sous Apache 2.0.
+    date_verification: "2026-10-04"
+
+  - id: bge_m3
+    nom: "BAAI/bge-m3 (HuggingFace)"
+    source: "Beijing Academy of Artificial Intelligence (BAAI)"
+    url: "https://huggingface.co/BAAI/bge-m3"
+    usage_prevu: "Embeddings pour la recherche dans la bibliothèque de textes juridiques"
+    licence: "MIT"
+    usage_commercial: true
+    statut_licence: "libre"
+    notes: >
+      MIT. Usage commercial autorisé. Modèle multilingue (FR/EN/AR).
+      Non utilisé sur le contenu du coffre des dossiers.
+    date_verification: "2026-10-04"
+
+
+commercial_readiness:
+
+  bloquants:
+    - id: faceforensics_pp
+      raison: "CC BY-NC 4.0 — fine-tuning sur ce jeu requiert licence commerciale TUM"
+    - id: dfdc
+      raison: "Non-commercial research (Meta) — entraînement requiert accord Meta"
+    - id: asvspoof_2019
+      raison: "CC BY-NC-ND 4.0 — fine-tuning audio requiert licence commerciale"
+    - id: insightface_buffalo_s
+      raison: "Poids non commerciaux — KYC requiert licence commerciale InsightFace"
+
+  non_bloquants:
+    - id: efficientnet_b4_imagenet
+      raison: "BSD 3-Clause — poids de base commercialisables; restriction si fine-tuné sur CC BY-NC"
+    - id: resnet50_imagenet
+      raison: "BSD 3-Clause — même remarque"
+    - id: wav2vec2_base
+      raison: "Apache 2.0 — OK pour déploiement; restriction si fine-tuné sur ASVspoof CC BY-NC-ND"
+    - id: mediapipe_face_mesh
+      raison: "Apache 2.0 — aucune restriction"
+    - id: bge_m3
+      raison: "MIT — aucune restriction"
+
+  conclusion: >
+    Les 4 datasets d'entraînement principaux ne permettent pas un usage commercial sans
+    accord écrit. Les poids de modèles de base (EfficientNet, ResNet, Wav2Vec2, MediaPipe,
+    BGE-M3) sont commercialement libres. Pour un déploiement commercial :
+    1. Négocier une licence commerciale avec TUM (FaceForensics++) et Meta (DFDC)
+    2. Identifier des datasets avec licence commerciale alternative (ex. : constituer
+       un jeu propre avec consentement explicite)
+    3. Négocier une licence InsightFace pour le module KYC
+    Ce blocage est documenté comme décision humaine dans CLAUDE.md (item 5 des non-codables).
+
+notes: >
+  Avant tout entraînement ou fine-tuning, chaque dataset doit être enregistré ici avec :
+  - nom et version
+  - source et URL
+  - licence (CC, recherche, commercial)
+  - taille (n_samples, heures)
+  - générateurs couverts
+  - split train/validation/test
+  - hash SHA-256 de l'archive
+  - date d'acquisition
+  - restrictions d'usage
+  Aucun dataset non_commercial_uniquement ne peut être utilisé en production sans accord écrit.

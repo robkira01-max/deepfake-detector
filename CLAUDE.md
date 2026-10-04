@@ -260,7 +260,7 @@ docker-compose up
 | 2 | ✅ 2026-10-04 Vérification C2PA / Content Credentials — `C2PAVerifier`, `C2PAEngine`, `GET /c2pa/verify/{id}`, migration 0005, 25 tests. |
 | 3 | ✅ 2026-10-04 Scaffolding validation Règle 10 — `EngineValidationGate` (4 conditions), `load_engine_statuses()` JSON, `POST /models/engines/{name}/approve+promote`, model card `metadata`. 25 tests. Promotion réelle = décision humaine. |
 | 4 | ✅ 2026-10-04 legal_references.yaml v1.1 — champ `usage`, CAN/DGSI 120 restreint à `kyc`, R. c. Mohan ajouté `confirme`, CPCivQ ajouté `a_valider`, DGSI retiré des docstrings judiciaires. |
-| 5 | Audit licences datasets et modèles pour usage commercial |
+| 5 | ✅ 2026-10-04 Audit licences datasets et modèles — `datasets/registry.yaml` v1.1 (9 entrées : 4 bloquants non-commerciaux + 5 poids libres), `scripts/check_licence_compliance.py` (--strict exit 1, --json). |
 | 6 | Recruter expert forensique + 2–3 pilotes (litige, assurance) |
 | 7 | Prod : TSA accréditée, clés KMS/HSM, CI PostgreSQL, analyse vie privée (Loi 25 + biométrie) |
 
