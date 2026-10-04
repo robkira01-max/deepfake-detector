@@ -343,10 +343,7 @@
           <div class="coc-label">Blake3</div>
           <div class="coc-value accent">{{ media_file.hash_blake3 }}</div>
         </div>
-        <div class="coc-item">
-          <div class="coc-label">MD5</div>
-          <div class="coc-value">{{ media_file.hash_md5 }}</div>
-        </div>
+        <!-- MD5 déprécié — aucune valeur probatoire, champ nullable (Règle 2) -->
         <div class="coc-item">
           <div class="coc-label">Type MIME</div>
           <div class="coc-value">{{ media_file.mime_type }}</div>
