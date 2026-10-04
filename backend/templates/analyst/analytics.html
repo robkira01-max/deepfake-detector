@@ -1,0 +1,309 @@
+{% extends "analyst/base.html" %}
+{% set active_page = "analytics" %}
+{% block title %}Analytics{% endblock %}
+
+{% block head %}
+<style>
+.analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+.chart-wrap { position: relative; height: 260px; }
+.chart-wrap-sm { position: relative; height: 200px; }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+.kpi-val { font-size: 32px; font-weight: 800; line-height: 1; }
+.kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 6px; }
+.kpi-accent  { border-top: 3px solid var(--accent); }
+.kpi-danger  { border-top: 3px solid var(--danger); }
+.kpi-success { border-top: 3px solid var(--success); }
+.kpi-warn    { border-top: 3px solid #ffc107; }
+.period-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+.period-tab { font-size: 11px; font-weight: 600; padding: 5px 14px; border-radius: 20px;
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+  cursor: pointer; transition: all 150ms; }
+.period-tab.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent-text); }
+.period-tab:hover { border-color: var(--border-light); color: var(--text); }
+.engine-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.engine-label { font-size: 12px; color: var(--text-muted); width: 130px; flex-shrink: 0; }
+.engine-bar-wrap { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.engine-bar { height: 100%; border-radius: 4px; transition: width 600ms cubic-bezier(.4,0,.2,1); }
+.engine-val { font-size: 12px; font-weight: 600; width: 44px; text-align: right; }
+.section-title { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .08em; margin-bottom: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Analytics</div>
+    <div class="page-subtitle">Métriques forensiques — {{ total_analyses }} analyse(s) complétée(s)</div>
+  </div>
+</div>
+
+<div class="page-body">
+
+  <!-- ── KPIs ── -->
+  <div class="kpi-row">
+    <div class="kpi kpi-accent">
+      <div class="kpi-val" style="color:var(--accent)">{{ total_analyses }}</div>
+      <div class="kpi-label">Analyses totales</div>
+    </div>
+    <div class="kpi kpi-danger">
+      <div class="kpi-val" style="color:var(--danger)">{{ deepfake_count }}</div>
+      <div class="kpi-label">Deepfakes détectés</div>
+    </div>
+    <div class="kpi kpi-success">
+      <div class="kpi-val" style="color:var(--success)">{{ authentic_count }}</div>
+      <div class="kpi-label">Authentiques confirmés</div>
+    </div>
+    <div class="kpi kpi-warn">
+      <div class="kpi-val" style="color:#ffc107">{{ deepfake_rate }}%</div>
+      <div class="kpi-label">Taux deepfake</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val">{{ open_cases }}</div>
+      <div class="kpi-label">Dossiers ouverts</div>
+    </div>
+  </div>
+
+  <!-- ── Row 1 : Verdicts + Tendances ── -->
+  <div class="analytics-grid">
+
+    <!-- Donut verdicts -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+          </svg>
+          Répartition des verdicts
+        </span>
+      </div>
+      <div class="card-body">
+        {% if total_analyses == 0 %}
+        <div style="text-align:center;padding:60px 0;color:var(--text-muted);font-size:13px">
+          Aucune analyse complétée
+        </div>
+        {% else %}
+        <div class="chart-wrap-sm">
+          <canvas id="chartVerdicts"></canvas>
+        </div>
+        <div style="margin-top:16px">
+          {% for item in verdict_dist %}
+          <div class="engine-row" style="margin-bottom:8px">
+            <div class="engine-label" style="font-size:11px">{{ item.label }}</div>
+            <div class="engine-bar-wrap">
+              <div class="engine-bar" style="width:{{ item.pct }}%;background:{{ item.color }}"></div>
+            </div>
+            <div class="engine-val" style="color:{{ item.color }}">{{ item.pct }}%</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Tendances -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          Tendances temporelles
+        </span>
+        <div class="period-tabs">
+          <span class="period-tab active" onclick="switchPeriod(this,'monthly')">Mensuel</span>
+          <span class="period-tab" onclick="switchPeriod(this,'weekly')">Hebdo</span>
+          <span class="period-tab" onclick="switchPeriod(this,'daily')">Quotidien</span>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if total_analyses == 0 %}
+        <div style="text-align:center;padding:60px 0;color:var(--text-muted);font-size:13px">
+          Aucune donnée de tendance
+        </div>
+        {% else %}
+        <div class="chart-wrap">
+          <canvas id="chartTrends"></canvas>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /analytics-grid row 1 -->
+
+  <!-- ── Row 2 : Moteurs + Dossiers ── -->
+  <div class="analytics-grid" style="margin-top:20px">
+
+    <!-- Scores moteurs -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="8" width="6" height="13" rx="1"/>
+            <rect x="16" y="13" width="6" height="8" rx="1"/>
+          </svg>
+          Scores par moteur ML
+        </span>
+        <span style="font-size:11px;color:var(--text-muted)">Moyenne sur {{ total_analyses }} analyses</span>
+      </div>
+      <div class="card-body">
+        {% if total_analyses == 0 %}
+        <div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:13px">
+          Aucune donnée moteur
+        </div>
+        {% else %}
+        {% for eng in engines %}
+        <div class="engine-row">
+          <div class="engine-label">{{ eng.label }}</div>
+          <div class="engine-bar-wrap">
+            <div class="engine-bar" style="width:{{ eng.pct }}%;background:{{ eng.color }}"></div>
+          </div>
+          <div class="engine-val" style="color:{{ eng.color }}">{{ eng.mean_fmt }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Dossiers -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+          </svg>
+          Dossiers par statut &amp; juridiction
+        </span>
+      </div>
+      <div class="card-body">
+        {% if cases_total == 0 %}
+        <div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:13px">
+          Aucun dossier créé
+        </div>
+        {% else %}
+        <div class="section-title">Par statut</div>
+        {% for s in by_status %}
+        <div class="engine-row">
+          <div class="engine-label">{{ s.label }}</div>
+          <div class="engine-bar-wrap">
+            <div class="engine-bar" style="width:{{ s.pct }}%;background:{{ s.color }}"></div>
+          </div>
+          <div class="engine-val">{{ s.count }}</div>
+        </div>
+        {% endfor %}
+
+        <div class="section-title" style="margin-top:20px">Par juridiction</div>
+        {% for j in by_jurisdiction %}
+        <div class="engine-row">
+          <div class="engine-label">{{ j.label }}</div>
+          <div class="engine-bar-wrap">
+            <div class="engine-bar" style="width:{{ j.pct }}%;background:var(--accent)"></div>
+          </div>
+          <div class="engine-val">{{ j.count }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /analytics-grid row 2 -->
+
+</div><!-- /page-body -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Données JSON injectées server-side ─────────────────────────────────────
+const verdictData = {{ verdict_chart_json | safe }};
+const trendsData  = {{ trends_json | safe }};
+
+// ── Chart.js defaults ─────────────────────────────────────────────────────
+Chart.defaults.color = '#5a7a99';
+Chart.defaults.font.family = 'Inter, sans-serif';
+Chart.defaults.font.size = 11;
+
+// ── Donut — Verdicts ──────────────────────────────────────────────────────
+{% if total_analyses > 0 %}
+const ctxV = document.getElementById('chartVerdicts').getContext('2d');
+new Chart(ctxV, {
+  type: 'doughnut',
+  data: {
+    labels: verdictData.labels,
+    datasets: [{
+      data: verdictData.values,
+      backgroundColor: verdictData.colors,
+      borderWidth: 0,
+      hoverOffset: 6,
+    }]
+  },
+  options: {
+    cutout: '65%',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.label} : ${ctx.parsed} (${((ctx.parsed/verdictData.total)*100).toFixed(1)}%)`
+        }
+      }
+    },
+    animation: { animateScale: true }
+  }
+});
+
+// ── Line — Tendances ──────────────────────────────────────────────────────
+let trendsChart = null;
+const trendsCtx = document.getElementById('chartTrends').getContext('2d');
+
+function buildTrendsChart(data) {
+  if (trendsChart) trendsChart.destroy();
+  trendsChart = new Chart(trendsCtx, {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.period),
+      datasets: [
+        {
+          label: 'Deepfakes',
+          data: data.map(d => d.deepfake),
+          borderColor: '#ff4757',
+          backgroundColor: 'rgba(255,71,87,.10)',
+          tension: .35, fill: true, pointRadius: 3,
+        },
+        {
+          label: 'Authentiques',
+          data: data.map(d => d.authentic),
+          borderColor: '#00e676',
+          backgroundColor: 'rgba(0,230,118,.08)',
+          tension: .35, fill: true, pointRadius: 3,
+        },
+        {
+          label: 'Indéterminés',
+          data: data.map(d => d.undetermined),
+          borderColor: '#ffc107',
+          backgroundColor: 'rgba(255,193,7,.08)',
+          tension: .35, fill: true, pointRadius: 3,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.05)' } },
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, beginAtZero: true, ticks: { stepSize: 1 } }
+      },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 14 } } },
+    }
+  });
+}
+
+buildTrendsChart(trendsData.monthly || []);
+
+function switchPeriod(el, period) {
+  document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  buildTrendsChart(trendsData[period] || []);
+}
+{% endif %}
+</script>
+{% endblock %}

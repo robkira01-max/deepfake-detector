@@ -3,51 +3,251 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connexion — DeepfakeDetector Analyste</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <title>Connexion — DeepfakeDetector</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/analyst/static/style.css">
+  <style>
+    .login-page {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    /* ── Left panel — visual ── */
+    .login-visual {
+      background: linear-gradient(145deg, #05101e 0%, #0a1f38 50%, #061420 100%);
+      display: flex; flex-direction: column;
+      justify-content: center; padding: 60px;
+      position: relative; overflow: hidden;
+      border-right: 1px solid var(--border);
+    }
+    .login-visual::before {
+      content: '';
+      position: absolute; top: -200px; left: -200px;
+      width: 600px; height: 600px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,203,164,.08) 0%, transparent 70%);
+    }
+    .login-visual-logo {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 60px;
+    }
+    .login-visual-logo-text { font-size: 16px; font-weight: 700; color: var(--text); }
+    .login-visual-tagline {
+      font-size: clamp(26px, 3vw, 40px); font-weight: 800;
+      line-height: 1.15; letter-spacing: -.025em; margin-bottom: 24px;
+    }
+    .login-visual-tagline em { color: var(--accent-text); font-style: normal; }
+    .login-visual-sub { font-size: 14px; color: var(--text-muted); line-height: 1.7; max-width: 380px; margin-bottom: 40px; }
+    .login-pillars { display: flex; flex-direction: column; gap: 14px; }
+    .login-pillar {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 13px; font-weight: 500; color: var(--text-muted);
+    }
+    .login-pillar-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+    }
+    .login-visual-footer {
+      position: absolute; bottom: 32px; left: 60px; right: 60px;
+      font-size: 11px; color: var(--text-dim); line-height: 1.6;
+    }
+
+    /* ── Right panel — form ── */
+    .login-form-panel {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 60px 40px;
+      background: var(--bg);
+    }
+    .login-form-inner { width: 100%; max-width: 380px; }
+    .login-form-header { margin-bottom: 36px; }
+    .login-form-header h1 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+    .login-form-header p { font-size: 14px; color: var(--text-muted); }
+
+    /* Lang toggle */
+    .lang-toggle {
+      display: flex; gap: 0; border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden; margin-bottom: 32px;
+      width: fit-content;
+    }
+    .lang-btn {
+      padding: 6px 16px; font-size: 12px; font-weight: 700;
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      transition: all 150ms;
+    }
+    .lang-btn.active { background: var(--accent-glow); color: var(--accent-text); }
+    .lang-btn:hover:not(.active) { color: var(--text); }
+
+    .login-legal {
+      margin-top: 24px; padding: 14px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 11px; color: var(--text-muted); line-height: 1.7;
+      text-align: center;
+    }
+    .login-separator {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 11px; color: var(--text-dim); margin: 20px 0;
+    }
+    .login-separator::before, .login-separator::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .login-request-link {
+      display: block; text-align: center; font-size: 13px; color: var(--text-muted);
+    }
+    .login-request-link a { color: var(--accent); font-weight: 600; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .login-page { grid-template-columns: 1fr; }
+      .login-visual { display: none; }
+      .login-form-panel { padding: 40px 24px; }
+    }
+  </style>
 </head>
 <body>
 <div class="login-page">
-  <div class="login-card">
-    <div class="login-logo">
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-        <rect width="56" height="56" rx="14" fill="#00cba4" fill-opacity=".1" stroke="#00cba4" stroke-opacity=".3" stroke-width="1"/>
-        <path d="M28 10L44 19v18l-16 9-16-9V19L28 10z" stroke="#00cba4" stroke-width="2" fill="none"/>
-        <path d="M28 10v28M12 19l16 9 16-9" stroke="#00cba4" stroke-width="2" opacity=".3"/>
-        <circle cx="28" cy="28" r="5" fill="#00cba4" fill-opacity=".8"/>
+
+  <!-- ── Left: visual panel ── -->
+  <div class="login-visual">
+    <div class="login-visual-logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="8" fill="#00cba4" fill-opacity=".1" stroke="#00cba4" stroke-opacity=".3" stroke-width="1"/>
+        <path d="M16 6L26 11v10l-10 5L6 21V11L16 6z" stroke="#00cba4" stroke-width="1.5" fill="none"/>
+        <path d="M16 6v16M6 11l10 5 10-5" stroke="#00cba4" stroke-width="1.5" opacity=".3"/>
+        <circle cx="16" cy="16" r="3" fill="#00cba4"/>
       </svg>
-      <h1>Interface Analyste</h1>
-      <p>Plateforme forensique deepfake — Canada</p>
+      <span class="login-visual-logo-text">DeepfakeDetector Canada</span>
     </div>
 
-    {% if error %}
-    <div class="flash flash-error" style="margin-bottom:20px">{{ error }}</div>
-    {% endif %}
+    <div class="login-visual-tagline">
+      La preuve numérique<br>mérite une <em>certification</em>
+    </div>
+    <p class="login-visual-sub">
+      Analyse forensique de médias synthétiques avec chaîne de possession
+      certifiée RFC 3161 et rapports conformes au droit canadien.
+    </p>
 
-    <form method="post" action="/analyst/login">
-      <div class="form-group">
-        <label class="form-label">Nom d'utilisateur</label>
-        <input name="username" type="text" class="form-control" placeholder="analyste@exemple.ca" autocomplete="username" required autofocus>
+    <div class="login-pillars">
+      <div class="login-pillar">
+        <span class="login-pillar-dot"></span>
+        SHA-256 probatoire + horodatage TSA RFC 3161
       </div>
-      <div class="form-group">
-        <label class="form-label">Mot de passe</label>
-        <input name="password" type="password" class="form-control" placeholder="••••••••••••" autocomplete="current-password" required>
+      <div class="login-pillar">
+        <span class="login-pillar-dot"></span>
+        7 moteurs forensiques + C2PA Content Credentials
       </div>
-      <button type="submit" class="btn btn-primary w-full" style="justify-content:center">
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
-        </svg>
-        Se connecter
-      </button>
-    </form>
+      <div class="login-pillar">
+        <span class="login-pillar-dot"></span>
+        Rapports PDF/A-3 signés pour tribunaux
+      </div>
+      <div class="login-pillar">
+        <span class="login-pillar-dot"></span>
+        Hébergement canadien · AES-256-GCM at-rest
+      </div>
+    </div>
 
-    <div class="login-legal">
-      Accès réservé aux analystes autorisés.<br>
-      Toutes les sessions sont enregistrées et auditées.<br>
-      Conforme LPC art. 31.1-31.6 &bull; R. c. Mohan [1994] 2 RCS 9
+    <div class="login-visual-footer">
+      Conçu pour soutenir l'évaluation de l'intégrité et de la provenance technique
+      de contenus numériques, sans constituer à lui seul une conclusion d'expert.
     </div>
   </div>
+
+  <!-- ── Right: form panel ── -->
+  <div class="login-form-panel">
+    <div class="login-form-inner">
+
+      <div class="lang-toggle">
+        <button class="lang-btn active" id="btn-fr" onclick="setLang('fr')">Français</button>
+        <button class="lang-btn" id="btn-en" onclick="setLang('en')">English</button>
+      </div>
+
+      <div class="login-form-header">
+        <h1 id="lbl-title">Connexion analyste</h1>
+        <p id="lbl-sub">Accès réservé aux analystes et avocats autorisés.</p>
+      </div>
+
+      {% if error %}
+      <div class="flash flash-error" style="margin-bottom:20px">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/analyst/login">
+        <div class="form-group">
+          <label class="form-label" id="lbl-user">Nom d'utilisateur</label>
+          <input name="username" type="text" class="form-control"
+            placeholder="avocat@cabinet.ca" autocomplete="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="lbl-pass">Mot de passe</label>
+          <input name="password" type="password" class="form-control"
+            placeholder="••••••••••••" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;margin-top:4px">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+          </svg>
+          <span id="lbl-submit">Se connecter</span>
+        </button>
+      </form>
+
+      <div class="login-separator" id="lbl-sep">ou</div>
+      <div class="login-request-link">
+        <span id="lbl-no-account">Pas encore de compte ?</span>
+        <a href="mailto:acces@deepfakedetector.ca" id="lbl-request">Demander un accès →</a>
+      </div>
+
+      <div class="login-legal" id="lbl-legal">
+        Accès réservé aux analystes autorisés.<br>
+        Toutes les sessions sont enregistrées et auditées.<br>
+        Conforme LPC art. 31.1-31.6 &bull; R. c. Mohan [1994] 2 RCS 9
+      </div>
+
+      <div style="text-align:center;margin-top:20px">
+        <a href="/" style="font-size:12px;color:var(--text-muted)">← Retour à l'accueil</a>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+<script>
+const T = {
+  fr: {
+    title: "Connexion analyste",
+    sub: "Accès réservé aux analystes et avocats autorisés.",
+    user: "Nom d'utilisateur",
+    pass: "Mot de passe",
+    submit: "Se connecter",
+    sep: "ou",
+    noAccount: "Pas encore de compte ?",
+    request: "Demander un accès →",
+    legal: "Accès réservé aux analystes autorisés.<br>Toutes les sessions sont enregistrées et auditées.<br>Conforme LPC art. 31.1-31.6 · R. c. Mohan [1994] 2 RCS 9",
+  },
+  en: {
+    title: "Analyst login",
+    sub: "Access restricted to authorized analysts and lawyers.",
+    user: "Username",
+    pass: "Password",
+    submit: "Sign in",
+    sep: "or",
+    noAccount: "No account yet?",
+    request: "Request access →",
+    legal: "Access restricted to authorized analysts.<br>All sessions are recorded and audited.<br>Compliant with CEA s. 31.1-31.6 · R. v. Mohan [1994] 2 SCR 9",
+  },
+};
+function setLang(lang) {
+  document.getElementById('btn-fr').classList.toggle('active', lang === 'fr');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  const t = T[lang];
+  document.getElementById('lbl-title').textContent = t.title;
+  document.getElementById('lbl-sub').textContent = t.sub;
+  document.getElementById('lbl-user').textContent = t.user;
+  document.getElementById('lbl-pass').textContent = t.pass;
+  document.getElementById('lbl-submit').textContent = t.submit;
+  document.getElementById('lbl-sep').textContent = t.sep;
+  document.getElementById('lbl-no-account').textContent = t.noAccount;
+  document.getElementById('lbl-request').textContent = t.request;
+  document.getElementById('lbl-legal').innerHTML = t.legal;
+  document.documentElement.lang = lang;
+}
+</script>
 </body>
 </html>

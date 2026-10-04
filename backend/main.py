@@ -7,7 +7,8 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates as _Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -333,8 +334,20 @@ def health() -> dict:
     return resp
 
 
-@app.get("/", tags=["Système"])
-def root() -> dict:
+_landing_templates = _Jinja2Templates(
+    directory=str(_Path(__file__).parent / "templates")
+)
+
+
+@app.get("/", tags=["Système"], response_class=HTMLResponse, include_in_schema=False)
+def root(request: Request) -> HTMLResponse:
+    return _landing_templates.TemplateResponse(
+        request, "landing.html", {"version": settings.app_version}
+    )
+
+
+@app.get("/api", tags=["Système"])
+def api_info() -> dict:
     return {
         "message": "DeepfakeDetector Canada API",
         "docs": "/docs",

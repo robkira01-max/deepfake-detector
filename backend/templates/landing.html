@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepfakeDetector — Analyse forensique de médias numériques</title>
+  <meta name="description" content="Plateforme d'analyse forensique pour avocats et juristes. Chaîne de possession certifiée, rapports pour tribunaux, conforme LPC art. 31.1-31.6.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ── Tokens ─────────────────────────────────────────────────────────── */
+    :root {
+      --bg:          #05101e;
+      --surface:     #0a1828;
+      --surface-2:   #0f1f32;
+      --border:      #172b42;
+      --accent:      #00cba4;
+      --accent-dim:  #008f72;
+      --accent-glow: rgba(0,203,164,.14);
+      --accent-text: #00f5c4;
+      --text:        #dde8f5;
+      --text-muted:  #5a7a9a;
+      --danger:      #ff4757;
+      --warning:     #ffb700;
+      --font:        'Inter', system-ui, sans-serif;
+      --font-mono:   'JetBrains Mono', monospace;
+      --radius:      12px;
+      --radius-lg:   20px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.65; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-text); }
+
+    /* ── Nav ──────────────────────────────────────────────────────────────── */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; height: 64px;
+      background: rgba(5,16,30,.85); backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; }
+    .nav-logo-text { font-size: 15px; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+    .nav-logo-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: .06em;
+      background: var(--accent-glow); color: var(--accent-text);
+      border: 1px solid rgba(0,203,164,.3); border-radius: 20px;
+      padding: 2px 8px; text-transform: uppercase;
+    }
+    .nav-actions { display: flex; align-items: center; gap: 12px; }
+    .nav-lang {
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 10px; cursor: pointer; transition: all 150ms;
+    }
+    .nav-lang:hover { color: var(--accent-text); border-color: rgba(0,203,164,.4); }
+
+    /* ── Buttons ──────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; border-radius: 8px;
+      padding: 9px 18px; border: none; cursor: pointer;
+      transition: all 180ms cubic-bezier(.23,1,.32,1);
+    }
+    .btn-primary {
+      background: var(--accent); color: #032016;
+    }
+    .btn-primary:hover { background: var(--accent-text); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,203,164,.35); }
+    .btn-ghost {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: rgba(0,203,164,.4); }
+    .btn-lg { padding: 13px 28px; font-size: 15px; border-radius: 10px; }
+    .btn-outline {
+      background: transparent; color: var(--accent);
+      border: 1px solid rgba(0,203,164,.4);
+    }
+    .btn-outline:hover { background: var(--accent-glow); border-color: var(--accent); }
+
+    /* ── Hero ──────────────────────────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 80px 24px 60px;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,203,164,.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--accent-text); margin-bottom: 28px;
+      background: var(--accent-glow); border: 1px solid rgba(0,203,164,.25);
+      padding: 6px 14px; border-radius: 20px;
+    }
+    .hero-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.85)} }
+    .hero-title {
+      font-size: clamp(36px, 6vw, 68px); font-weight: 900;
+      line-height: 1.08; letter-spacing: -.03em;
+      max-width: 900px; margin-bottom: 24px;
+    }
+    .hero-title em { color: var(--accent-text); font-style: normal; }
+    .hero-subtitle {
+      font-size: clamp(16px, 2vw, 20px); color: var(--text-muted);
+      max-width: 600px; margin-bottom: 40px; line-height: 1.7;
+    }
+    .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-bottom: 60px; }
+    .hero-disclaimer {
+      max-width: 620px;
+      background: rgba(255,183,0,.06); border: 1px solid rgba(255,183,0,.2);
+      border-radius: var(--radius); padding: 14px 20px;
+      font-size: 12px; color: var(--text-muted); line-height: 1.7;
+    }
+    .hero-disclaimer strong { color: var(--warning); }
+
+    /* ── Trust bar ─────────────────────────────────────────────────────────── */
+    .trust-bar {
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: 32px; padding: 24px 40px;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .trust-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: .04em;
+    }
+    .trust-item svg { color: var(--accent); flex-shrink: 0; }
+
+    /* ── Features ─────────────────────────────────────────────────────────── */
+    .section { padding: 100px 24px; max-width: 1120px; margin: 0 auto; }
+    .section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 16px;
+    }
+    .section-title { font-size: clamp(28px, 4vw, 42px); font-weight: 800; letter-spacing: -.025em; margin-bottom: 16px; }
+    .section-sub { font-size: 16px; color: var(--text-muted); max-width: 560px; line-height: 1.7; margin-bottom: 60px; }
+
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+    .feature-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 32px;
+      transition: border-color 200ms, transform 200ms;
+    }
+    .feature-card:hover { border-color: rgba(0,203,164,.35); transform: translateY(-2px); }
+    .feature-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: var(--accent-glow); border: 1px solid rgba(0,203,164,.25);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    .feature-title { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+    .feature-body { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+    .feature-tag {
+      display: inline-block; margin-top: 16px;
+      font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--accent-text); background: var(--accent-glow);
+      border: 1px solid rgba(0,203,164,.2); border-radius: 20px; padding: 3px 10px;
+    }
+
+    /* ── Workflow ─────────────────────────────────────────────────────────── */
+    .workflow-section { background: var(--surface); padding: 100px 24px; }
+    .workflow-inner { max-width: 1000px; margin: 0 auto; }
+    .workflow-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; position: relative; }
+    .workflow-steps::before {
+      content: ''; position: absolute; top: 28px; left: 14%; right: 14%;
+      height: 1px; background: linear-gradient(90deg, transparent, var(--border), var(--border), transparent);
+    }
+    .workflow-step { text-align: center; padding: 0 20px 0; position: relative; }
+    .workflow-num {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--bg); border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 800; color: var(--accent);
+      margin: 0 auto 20px; position: relative; z-index: 1;
+    }
+    .workflow-num.active { background: var(--accent-glow); border-color: var(--accent); }
+    .workflow-label { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    .workflow-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+    /* ── Jurisdictions ────────────────────────────────────────────────────── */
+    .juri-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+    .juri-card {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px 28px;
+    }
+    .juri-flag { font-size: 28px; margin-bottom: 12px; }
+    .juri-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .juri-detail { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+    .juri-status {
+      display: inline-block; margin-top: 12px;
+      font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+      padding: 2px 10px; border-radius: 20px;
+    }
+    .juri-status.pilot { background: rgba(0,203,164,.12); color: var(--accent-text); border: 1px solid rgba(0,203,164,.25); }
+    .juri-status.target { background: rgba(79,172,254,.1); color: #4facfe; border: 1px solid rgba(79,172,254,.25); }
+
+    /* ── CTA section ──────────────────────────────────────────────────────── */
+    .cta-section {
+      padding: 100px 24px; text-align: center;
+      background: linear-gradient(180deg, transparent, rgba(0,203,164,.04));
+    }
+    .cta-inner { max-width: 640px; margin: 0 auto; }
+    .cta-title { font-size: clamp(28px, 4vw, 44px); font-weight: 900; letter-spacing: -.025em; margin-bottom: 16px; }
+    .cta-sub { font-size: 16px; color: var(--text-muted); margin-bottom: 36px; }
+    .cta-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    .footer {
+      border-top: 1px solid var(--border); padding: 40px 40px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+      font-size: 12px; color: var(--text-muted);
+    }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { color: var(--text-muted); }
+    .footer-links a:hover { color: var(--accent-text); }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .nav { padding: 0 20px; }
+      .nav-actions .btn-ghost { display: none; }
+      .trust-bar { gap: 20px; padding: 20px; }
+      .workflow-steps::before { display: none; }
+      .footer { flex-direction: column; gap: 16px; }
+    }
+    @media (max-width: 480px) {
+      .hero { padding: 100px 20px 60px; }
+      .hero-cta { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ───────────────────────────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-logo">
+    <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8" fill="#00cba4" fill-opacity=".12" stroke="#00cba4" stroke-opacity=".3" stroke-width="1"/>
+      <path d="M16 6L26 11v10l-10 5L6 21V11L16 6z" stroke="#00cba4" stroke-width="1.5" fill="none"/>
+      <path d="M16 6v16M6 11l10 5 10-5" stroke="#00cba4" stroke-width="1.5" opacity=".35"/>
+      <circle cx="16" cy="16" r="3" fill="#00cba4"/>
+    </svg>
+    <span class="nav-logo-text">DeepfakeDetector</span>
+    <span class="nav-logo-badge">Canada</span>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-lang" onclick="toggleLang(this)">EN</button>
+    <a href="/analyst/login" class="btn btn-ghost">Connexion</a>
+    <a href="mailto:acces@deepfakedetector.ca" class="btn btn-primary">Demander l'accès</a>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-eyebrow">
+    <span class="hero-eyebrow-dot"></span>
+    Forensique numérique · Litige · Assurance · KYC
+  </div>
+  <h1 class="hero-title">
+    L'authenticité des preuves<br>numériques, <em>certifiée</em>
+  </h1>
+  <p class="hero-subtitle">
+    Analysez vidéos, audios et documents pour détecter les contenus synthétiques.
+    Chaîne de possession certifiée RFC 3161, rapports prêts pour les tribunaux canadiens.
+  </p>
+  <div class="hero-cta">
+    <a href="/analyst/login" class="btn btn-primary btn-lg">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+      </svg>
+      Accéder à la plateforme
+    </a>
+    <a href="mailto:acces@deepfakedetector.ca" class="btn btn-outline btn-lg">
+      Demander un accès pilote
+    </a>
+  </div>
+  <div class="hero-disclaimer">
+    <strong>⚠ Avis important</strong> —
+    Cet outil est conçu pour soutenir l'évaluation de l'intégrité, de la provenance et de l'authenticité
+    technique de contenus numériques, sans constituer à lui seul une conclusion d'expert ou une preuve
+    définitive de manipulation. La validation humaine est obligatoire.
+  </div>
+</section>
+
+<!-- ── Trust bar ─────────────────────────────────────────────────────────── -->
+<div class="trust-bar">
+  <div class="trust-item">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+    AES-256-GCM at-rest
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+    </svg>
+    Horodatage TSA RFC 3161
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+    </svg>
+    SHA-256 probatoire
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14,2 14,8 20,8"/>
+    </svg>
+    LPC art. 31.1–31.6
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+    </svg>
+    JWT RS256 + MFA TOTP
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+    R. c. Mohan [1994] 2 RCS 9
+  </div>
+</div>
+
+<!-- ── Features ──────────────────────────────────────────────────────────── -->
+<div class="section">
+  <p class="section-label">Fonctionnalités clés</p>
+  <h2 class="section-title">Trois piliers pour le litige numérique</h2>
+  <p class="section-sub">Chaque étape du flux forensique est tracée, chiffrée et exportable pour le dossier d'avocat.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" stroke="#00cba4" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="feature-title">Chaîne de possession certifiée</div>
+      <div class="feature-body">
+        Chaque fichier est haché (SHA-256 + Blake3), horodaté via TSA RFC 3161
+        et journalisé dans un registre d'audit SHA-256 chaîné. Toute altération
+        ultérieure est détectée automatiquement.
+      </div>
+      <span class="feature-tag">LPC art. 31.1–31.6</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" stroke="#00cba4" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+        </svg>
+      </div>
+      <div class="feature-title">Analyse multi-moteurs assistée</div>
+      <div class="feature-body">
+        Sept moteurs forensiques (texture, temporel, biométrie, audio, métadonnées,
+        phase, rPPG) analysent chaque fichier de façon indépendante.
+        C2PA Content Credentials vérifie la provenance cryptographique.
+      </div>
+      <span class="feature-tag">Expert dans la boucle</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" stroke="#00cba4" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10,9 9,9 8,9"/>
+        </svg>
+      </div>
+      <div class="feature-title">Rapports pour les tribunaux</div>
+      <div class="feature-body">
+        Générez des rapports PDF/A-3 signés (tribunal, affidavit, exécutif, bilingue).
+        Chaque rapport est horodaté, signé RSA-4096 et exportable avec le dossier complet.
+      </div>
+      <span class="feature-tag">R. c. Mohan [1994] 2 RCS 9</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Workflow ────────────────────────────────────────────────────────────── -->
+<div class="workflow-section">
+  <div class="workflow-inner">
+    <p class="section-label" style="text-align:center;margin-bottom:12px">Flux forensique</p>
+    <h2 class="section-title" style="text-align:center;margin-bottom:12px">En 5 étapes, du fichier au rapport</h2>
+    <p style="text-align:center;color:var(--text-muted);font-size:14px;margin-bottom:56px">
+      Chaque étape est journalisée dans le registre d'audit et peut être exportée pour le dossier.
+    </p>
+    <div class="workflow-steps">
+      <div class="workflow-step">
+        <div class="workflow-num active">1</div>
+        <div class="workflow-label">Ingestion</div>
+        <div class="workflow-desc">Dépôt sécurisé du fichier.<br>SHA-256 + Blake3 + quarantaine.</div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num active">2</div>
+        <div class="workflow-label">Horodatage</div>
+        <div class="workflow-desc">Horodatage TSA RFC 3161.<br>Preuve d'antériorité certifiée.</div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num active">3</div>
+        <div class="workflow-label">Analyse</div>
+        <div class="workflow-desc">7 moteurs + C2PA.<br>Résultats par couche.</div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num active">4</div>
+        <div class="workflow-label">Revue expert</div>
+        <div class="workflow-desc">L'analyste valide.<br>L'outil assiste, l'humain conclut.</div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num active">5</div>
+        <div class="workflow-label">Rapport</div>
+        <div class="workflow-desc">PDF/A-3 signé.<br>Export dossier complet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Jurisdictions ─────────────────────────────────────────────────────── -->
+<div class="section">
+  <p class="section-label">Juridictions</p>
+  <h2 class="section-title">Conçu pour le Canada et Djibouti</h2>
+  <p class="section-sub">Modules de juridiction séparés : terminologie, modèles de pièces et sources propres à chaque ressort.</p>
+  <div class="juri-grid">
+    <div class="juri-card">
+      <div class="juri-flag">🇨🇦</div>
+      <div class="juri-name">Canada fédéral</div>
+      <div class="juri-detail">Common law · Anglais / Français · Formules fédérales</div>
+      <span class="juri-status target">Marché cible</span>
+    </div>
+    <div class="juri-card">
+      <div class="juri-flag">🍁</div>
+      <div class="juri-name">Québec</div>
+      <div class="juri-detail">Droit civil · Français · CPC art. 282–293 · Loi 25</div>
+      <span class="juri-status target">Marché cible</span>
+    </div>
+    <div class="juri-card">
+      <div class="juri-flag">🇨🇦</div>
+      <div class="juri-name">Ontario</div>
+      <div class="juri-detail">Common law · Anglais / Français · Rules of Civil Procedure</div>
+      <span class="juri-status target">Marché cible</span>
+    </div>
+    <div class="juri-card">
+      <div class="juri-flag">🇩🇯</div>
+      <div class="juri-name">Djibouti</div>
+      <div class="juri-detail">Tradition civiliste française · Français / Arabe · JO-DJ</div>
+      <span class="juri-status pilot">Pilote actif</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────────── -->
+<div class="cta-section">
+  <div class="cta-inner">
+    <h2 class="cta-title">Prêt à analyser votre premier dossier ?</h2>
+    <p class="cta-sub">Accédez à la plateforme ou écrivez-nous pour un accès pilote sur votre cabinet.</p>
+    <div class="cta-btns">
+      <a href="/analyst/login" class="btn btn-primary btn-lg">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+        </svg>
+        Se connecter
+      </a>
+      <a href="mailto:acces@deepfakedetector.ca" class="btn btn-outline btn-lg">Demander un accès →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer class="footer">
+  <div style="display:flex;align-items:center;gap:10px">
+    <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
+      <path d="M16 6L26 11v10l-10 5L6 21V11L16 6z" stroke="#00cba4" stroke-width="1.5" fill="none"/>
+      <circle cx="16" cy="16" r="3" fill="#00cba4"/>
+    </svg>
+    <span>DeepfakeDetector Canada — v{{ version }}</span>
+  </div>
+  <div class="footer-links">
+    <a href="/docs">API</a>
+    <a href="/health">Statut</a>
+    <a href="/analyst/login">Connexion</a>
+  </div>
+  <div>Conçu pour soutenir l'évaluation forensique · Pas une conclusion d'expert</div>
+</footer>
+
+<script>
+function toggleLang(btn) {
+  const fr = document.documentElement.lang === 'fr';
+  document.documentElement.lang = fr ? 'en' : 'fr';
+  btn.textContent = fr ? 'FR' : 'EN';
+  // Minimal EN translations for key elements
+  const t = {
+    fr: {
+      title: "L'authenticité des preuves<br>numériques, <em>certifiée</em>",
+      sub: "Analysez vidéos, audios et documents pour détecter les contenus synthétiques.<br>Chaîne de possession certifiée RFC 3161, rapports prêts pour les tribunaux canadiens.",
+      cta1: "Accéder à la plateforme",
+      cta2: "Demander un accès pilote",
+      warn: "<strong>⚠ Avis important</strong> — Cet outil est conçu pour soutenir l'évaluation de l'intégrité, de la provenance et de l'authenticité technique de contenus numériques, sans constituer à lui seul une conclusion d'expert ou une preuve définitive de manipulation.",
+    },
+    en: {
+      title: "Digital evidence <em>authenticity</em>,<br>certified",
+      sub: "Analyze videos, audio and documents to detect synthetic content.<br>RFC 3161 certified chain of custody, reports ready for Canadian courts.",
+      cta1: "Access the platform",
+      cta2: "Request pilot access",
+      warn: "<strong>⚠ Important notice</strong> — This tool is designed to support the evaluation of the integrity, provenance and technical authenticity of digital content, and does not by itself constitute an expert conclusion or definitive proof of manipulation.",
+    },
+  };
+  const lang = fr ? 'en' : 'fr';
+  document.querySelector('.hero-title').innerHTML = t[lang].title;
+  document.querySelector('.hero-subtitle').innerHTML = t[lang].sub;
+  document.querySelector('.hero-disclaimer').innerHTML = t[lang].warn;
+}
+</script>
+
+</body>
+</html>

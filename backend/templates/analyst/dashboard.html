@@ -2,6 +2,57 @@
 {% set active_page = "dashboard" %}
 {% block title %}Tableau de bord{% endblock %}
 
+{% block head %}
+<style>
+/* ── Onboarding overlay ──────────────────────────────────────────────── */
+.onboarding-backdrop {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(5,16,30,.85); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.onboarding-modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; width: 100%; max-width: 560px;
+  padding: 40px; position: relative;
+  box-shadow: 0 24px 64px rgba(0,0,0,.6);
+}
+.onboarding-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-muted); font-size: 16px;
+  transition: all 150ms;
+}
+.onboarding-close:hover { color: var(--text); background: var(--surface); }
+.onboarding-step { display: none; }
+.onboarding-step.active { display: block; }
+.onboarding-step-num {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent-text); margin-bottom: 16px;
+}
+.onboarding-title { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 10px; }
+.onboarding-body { font-size: 14px; color: var(--text-muted); line-height: 1.75; margin-bottom: 28px; }
+.onboarding-icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: var(--accent-glow); border: 1px solid rgba(0,203,164,.25);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+}
+.onboarding-actions { display: flex; gap: 10px; align-items: center; }
+.onboarding-progress {
+  display: flex; gap: 6px; margin-bottom: 28px;
+}
+.onboarding-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); transition: background 300ms;
+}
+.onboarding-dot.done { background: var(--accent); }
+.onboarding-dot.active { background: var(--accent-text); width: 20px; border-radius: 3px; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div>
@@ -112,4 +163,119 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if stats.total == 0 %}
+<!-- Onboarding wizard — premier login, aucun dossier -->
+<div class="onboarding-backdrop" id="onboarding">
+  <div class="onboarding-modal">
+    <button class="onboarding-close" onclick="closeOnboarding()" aria-label="Fermer">✕</button>
+
+    <div class="onboarding-progress">
+      <div class="onboarding-dot active" id="dot-1"></div>
+      <div class="onboarding-dot" id="dot-2"></div>
+      <div class="onboarding-dot" id="dot-3"></div>
+    </div>
+
+    <!-- Step 1: Bienvenue -->
+    <div class="onboarding-step active" id="step-1">
+      <div class="onboarding-icon">
+        <svg width="24" height="24" fill="none" stroke="#00cba4" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="onboarding-step-num">Étape 1 sur 3</div>
+      <div class="onboarding-title">Bienvenue, {{ user.username }} 👋</div>
+      <div class="onboarding-body">
+        <strong style="color:var(--text)">DeepfakeDetector</strong> est une plateforme d'analyse forensique
+        de médias numériques. Elle vous aide à évaluer l'authenticité d'une vidéo, d'un audio ou d'un document
+        dans le cadre d'un dossier juridique.<br><br>
+        <strong style="color:var(--warning)">Important :</strong> cet outil assiste l'expert humain.
+        Il ne conclut pas à lui seul — une validation par un professionnel qualifié est toujours nécessaire.
+      </div>
+      <div class="onboarding-actions">
+        <button class="btn btn-primary" onclick="nextStep(2)">
+          Continuer
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="9,18 15,12 9,6"/>
+          </svg>
+        </button>
+        <button class="btn btn-ghost" onclick="closeOnboarding()">Passer</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Créer un dossier -->
+    <div class="onboarding-step" id="step-2">
+      <div class="onboarding-icon">
+        <svg width="24" height="24" fill="none" stroke="#00cba4" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <div class="onboarding-step-num">Étape 2 sur 3</div>
+      <div class="onboarding-title">Créez votre premier dossier</div>
+      <div class="onboarding-body">
+        Un <strong style="color:var(--text)">dossier</strong> regroupe tous les fichiers d'une même affaire :
+        vidéos, audios, documents. Il est associé à une juridiction (Canada fédéral, Québec, Ontario, Djibouti)
+        et à un numéro de référence interne.<br><br>
+        Chaque action sur ce dossier est inscrite dans un journal d'audit SHA-256 chaîné, immuable.
+      </div>
+      <div class="onboarding-actions">
+        <a href="/analyst/cases/new" class="btn btn-primary">Créer un dossier →</a>
+        <button class="btn btn-ghost" onclick="nextStep(3)">Plus tard</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Déposer un fichier -->
+    <div class="onboarding-step" id="step-3">
+      <div class="onboarding-icon">
+        <svg width="24" height="24" fill="none" stroke="#00cba4" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17,8 12,3 7,8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="onboarding-step-num">Étape 3 sur 3</div>
+      <div class="onboarding-title">Déposez une pièce pour analyse</div>
+      <div class="onboarding-body">
+        Depuis un dossier, déposez un fichier (vidéo, audio, image, PDF). La plateforme calcule
+        automatiquement les empreintes <strong style="color:var(--text)">SHA-256 + Blake3</strong>
+        et obtient un <strong style="color:var(--text)">horodatage TSA RFC 3161</strong>
+        pour certifier l'antériorité.<br><br>
+        Le fichier est ensuite analysé par les moteurs forensiques disponibles.
+      </div>
+      <div class="onboarding-actions">
+        <button class="btn btn-primary" onclick="closeOnboarding()">Commencer →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function nextStep(n) {
+  document.querySelectorAll('.onboarding-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const dot = document.getElementById('dot-' + i);
+    dot.classList.remove('active', 'done');
+    if (i < n) dot.classList.add('done');
+    if (i === n) dot.classList.add('active');
+  }
+}
+function closeOnboarding() {
+  const el = document.getElementById('onboarding');
+  el.style.opacity = '0';
+  el.style.transition = 'opacity 250ms';
+  setTimeout(() => el.remove(), 260);
+  localStorage.setItem('onboarding_done_{{ user.username }}', '1');
+}
+if (localStorage.getItem('onboarding_done_{{ user.username }}')) {
+  document.getElementById('onboarding')?.remove();
+}
+</script>
+{% endif %}
 {% endblock %}
