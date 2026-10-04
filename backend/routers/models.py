@@ -203,6 +203,146 @@ def validate_version(
     return ModelVersionOut.from_orm(mv)
 
 
+# ── Validation des moteurs (Règle 10) ─────────────────────────────────────────
+
+class EngineApprovalRequest(BaseModel):
+    review_notes: str = Field(..., min_length=10, max_length=2000)
+
+
+@router.get(
+    "/engines/{engine_name}/validation-status",
+    summary="État des 4 conditions de validation d'un moteur (Règle 10)",
+)
+def engine_validation_status(
+    engine_name: str,
+    db: Annotated[Session, Depends(get_db)],
+    _user: Annotated[User, Depends(require_analyst)],
+) -> dict:
+    from engines.validation_gate import EngineValidationGate, VALID_ENGINES  # noqa: PLC0415
+    if engine_name not in VALID_ENGINES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Moteur inconnu '{engine_name}'. Valeurs : {sorted(VALID_ENGINES)}",
+        )
+    gate = EngineValidationGate.check(engine_name, db)
+    return gate.to_dict()
+
+
+@router.post(
+    "/engines/{engine_name}/approve",
+    status_code=status.HTTP_201_CREATED,
+    summary="Journalise l'approbation humaine (condition 4 Règle 10) — ne promeut pas encore",
+)
+def approve_engine(
+    engine_name: str,
+    payload: EngineApprovalRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_admin)],
+) -> dict:
+    from engines.validation_gate import VALID_ENGINES  # noqa: PLC0415
+    if engine_name not in VALID_ENGINES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Moteur inconnu '{engine_name}'. Valeurs : {sorted(VALID_ENGINES)}",
+        )
+    db.add(AuditLog(
+        user_id=user.id,
+        user_username=user.username,
+        action=AuditAction.ENGINE_STATUS_CHANGED,
+        resource_type="Engine",
+        resource_id=engine_name,
+        details={
+            "engine_name": engine_name,
+            "action": "approved",
+            "approved_by": user.username,
+            "review_notes": payload.review_notes,
+        },
+    ))
+    db.commit()
+    log.info("engine_approved", engine=engine_name, by=user.username)
+    return {
+        "engine_name": engine_name,
+        "action": "approved",
+        "by": user.username,
+        "message": (
+            "Approbation journalisée. Appeler POST /models/engines/{name}/promote "
+            "quand les 3 autres conditions sont satisfaites."
+        ),
+    }
+
+
+@router.post(
+    "/engines/{engine_name}/promote",
+    summary="Promeut un moteur de 'experimental' à 'validated' (Règle 10 — 4 conditions requises)",
+)
+def promote_engine(
+    engine_name: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_admin)],
+) -> dict:
+    from engines.validation_gate import EngineValidationGate, VALID_ENGINES  # noqa: PLC0415
+    if engine_name not in VALID_ENGINES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Moteur inconnu '{engine_name}'. Valeurs : {sorted(VALID_ENGINES)}",
+        )
+    gate = EngineValidationGate.check(engine_name, db)
+    if not gate.can_promote:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"Le moteur '{engine_name}' ne satisfait pas les 4 conditions (Règle 10).",
+                "blocking_reasons": gate.blocking_reasons,
+                "conditions": {
+                    "metrics_ok": gate.metrics_ok,
+                    "model_card_ok": gate.model_card_ok,
+                    "protocol_ok": gate.protocol_ok,
+                    "human_approval_ok": gate.human_approval_ok,
+                },
+            },
+        )
+
+    _write_engine_status(engine_name, "validated")
+
+    db.add(AuditLog(
+        user_id=user.id,
+        user_username=user.username,
+        action=AuditAction.ENGINE_STATUS_CHANGED,
+        resource_type="Engine",
+        resource_id=engine_name,
+        details={
+            "engine_name": engine_name,
+            "new_status": "validated",
+            "action": "promoted",
+            "promoted_by": user.username,
+        },
+    ))
+    db.commit()
+    log.info("engine_promoted", engine=engine_name, by=user.username)
+    return {
+        "engine_name": engine_name,
+        "new_status": "validated",
+        "promoted_by": user.username,
+        "message": (
+            f"Le moteur '{engine_name}' est maintenant 'validated'. "
+            "Les prochaines analyses l'incluront dans le score de fusion."
+        ),
+    }
+
+
+def _write_engine_status(engine_name: str, new_status: str) -> None:
+    """Met à jour evaluation/engine_statuses.json avec le nouveau statut."""
+    import json as _json  # noqa: PLC0415
+    from engines.validation_gate import _EVAL_ROOT  # noqa: PLC0415
+    statuses_path = _EVAL_ROOT / "engine_statuses.json"
+    try:
+        data = _json.loads(statuses_path.read_text(encoding="utf-8"))
+    except Exception:
+        data = {"schema_version": "1.0", "statuses": {}}
+    data.setdefault("statuses", {})[engine_name] = new_status
+    statuses_path.write_text(_json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
 @router.patch("/{version_id}/disable", response_model=ModelVersionOut)
 def disable_version(
     version_id: int,

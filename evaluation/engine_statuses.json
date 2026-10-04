@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "description": "Statuts de validation des moteurs de détection — mis à jour via POST /models/engines/{name}/promote (Règle 10 CLAUDE.md). Ne pas modifier à la main.",
+  "statuses": {
+    "texture":    "experimental",
+    "temporal":   "experimental",
+    "rppg":       "experimental",
+    "biometrics": "experimental",
+    "audio":      "disabled",
+    "phase":      "experimental",
+    "metadata":   "experimental"
+  }
+}

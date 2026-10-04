@@ -24,6 +24,8 @@ from models.analysis import Verdict
 
 # Chemin du fichier de métriques validé (CLAUDE.md Règle 7)
 _METRICS_PATH = Path(__file__).resolve().parents[2] / "evaluation" / "metrics" / "metrics.json"
+# Statuts persistés (écrits par POST /models/engines/{name}/promote — Règle 10)
+_ENGINE_STATUSES_PATH = Path(__file__).resolve().parents[2] / "evaluation" / "engine_statuses.json"
 
 
 def _require_metrics() -> None:
@@ -64,6 +66,27 @@ ENGINE_DEFAULT_STATUS: dict[str, EngineStatus] = {
     "phase":      "experimental",  # STFT phase — fonctionnel, non benchmarké deepfake
     "metadata":   "experimental",  # heuristiques métadonnées — fonctionnel, non benchmarké
 }
+
+def load_engine_statuses() -> dict[str, EngineStatus]:
+    """Charge les statuts depuis engine_statuses.json (overlay sur ENGINE_DEFAULT_STATUS).
+
+    Si le fichier n'existe pas ou est illisible, retourne ENGINE_DEFAULT_STATUS.
+    Appelée par fuse_scores() quand engine_statuses n'est pas fourni explicitement.
+    """
+    if not _ENGINE_STATUSES_PATH.exists():
+        return ENGINE_DEFAULT_STATUS.copy()
+    try:
+        import json as _json  # noqa: PLC0415
+        data = _json.loads(_ENGINE_STATUSES_PATH.read_text(encoding="utf-8"))
+        overrides = data.get("statuses", {})
+        result = ENGINE_DEFAULT_STATUS.copy()
+        for name, s in overrides.items():
+            if name in result and s in ("validated", "experimental", "disabled"):
+                result[name] = s  # type: ignore[assignment]
+        return result
+    except Exception:
+        return ENGINE_DEFAULT_STATUS.copy()
+
 
 THRESHOLD_AUTHENTIC = 0.35
 THRESHOLD_DEEPFAKE  = 0.55
@@ -108,8 +131,8 @@ def fuse_scores(
 
     Args:
         engine_statuses: Surcharge du statut par composante.
-                         Si None, utilise ENGINE_DEFAULT_STATUS.
-                         Utilisé par le registre de modèles pour appliquer les statuts réels.
+                         Si None, lit evaluation/engine_statuses.json via load_engine_statuses()
+                         (ENGINE_DEFAULT_STATUS si le fichier est absent).
     """
     components = {
         "texture":    score_texture,
@@ -121,7 +144,7 @@ def fuse_scores(
         "metadata":   score_metadata,
     }
 
-    statuses = engine_statuses if engine_statuses is not None else ENGINE_DEFAULT_STATUS
+    statuses = engine_statuses if engine_statuses is not None else load_engine_statuses()
     allow_experimental = settings.allow_experimental_engines
 
     # Partition des composantes selon le statut
