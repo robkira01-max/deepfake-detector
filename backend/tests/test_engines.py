@@ -101,11 +101,9 @@ class TestFusionEngine:
         from engines.fusion import fuse_scores
 
         result = fuse_scores()
-        # Brief v2 P0.2 : métriques à None jusqu'à mesure sur jeu de test indépendant
-        assert result.model_far is None
-        assert result.model_frr is None
-        assert result.model_eer is None
-        assert result.model_auc is None
+        # Brief v2 P0.2 : métriques indisponibles jusqu'à validation sur jeu de test indépendant
+        assert result.metrics_available is False
+        assert result.metrics_artifact is None
 
 
 class TestVideoEngineEdgeCases:
@@ -234,3 +232,396 @@ class TestMetadataEngine:
             assert 0.0 <= result.score <= 1.0
         except ImportError:
             pytest.skip("MetadataEngine pas encore implémenté")
+
+
+# ── Tests plugin API ──────────────────────────────────────────────────────────
+
+class TestEnginePlugin:
+    """Tests de l'ABC EnginePlugin et du dataclass EngineResult."""
+
+    def _make_plugin(self, name: str = "test_plugin", score: float = 0.5):
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        _name = name
+        _score = score
+
+        class _Plugin(EnginePlugin):
+            def analyze(self, file_path: Path) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=_score)
+
+        _Plugin.name = _name
+        return _Plugin
+
+    def test_engine_result_defaults(self):
+        from engines.plugin import EngineResult
+        r = EngineResult(engine_name="x", score=0.3)
+        assert r.confidence == 1.0
+        assert r.metadata == {}
+        assert r.error is None
+
+    def test_engine_result_with_error(self):
+        from engines.plugin import EngineResult
+        r = EngineResult(engine_name="x", score=0.0, error="connexion refusée")
+        assert r.error == "connexion refusée"
+
+    def test_plugin_abstract_analyze(self):
+        from engines.plugin import EnginePlugin
+        with pytest.raises(TypeError):
+            EnginePlugin()  # ne peut pas instancier une classe abstraite
+
+    def test_plugin_supports_all_by_default(self):
+        cls = self._make_plugin()
+        assert cls().supports("video") is True
+        assert cls().supports("audio") is True
+        assert cls().supports("document") is True
+
+    def test_plugin_analyze_returns_result(self, tmp_path):
+        from engines.plugin import EngineResult
+        from pathlib import Path
+        cls = self._make_plugin(score=0.7)
+        result = cls().analyze(tmp_path / "dummy.mp4")
+        assert isinstance(result, EngineResult)
+        assert result.score == 0.7
+
+
+# ── Tests PluginRegistry ──────────────────────────────────────────────────────
+
+class TestPluginRegistry:
+    """Tests de PluginRegistry : enregistrement, active_names, run_all."""
+
+    def _make_registry_with_plugins(self):
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _ValidatedPlugin(EnginePlugin):
+            name = "valid_plugin"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=0.8)
+
+        class _ExperimentalPlugin(EnginePlugin):
+            name = "exp_plugin"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=0.4)
+
+        class _DisabledPlugin(EnginePlugin):
+            name = "dis_plugin"
+            def analyze(self, f: Path) -> EngineResult:  # noqa: PLR6301
+                return EngineResult(engine_name="dis_plugin", score=0.9)
+
+        registry = PluginRegistry()
+        registry.register(_ValidatedPlugin, status="validated", weight=0.5)
+        registry.register(_ExperimentalPlugin, status="experimental", weight=0.3)
+        registry.register(_DisabledPlugin, status="disabled", weight=0.2)
+        return registry
+
+    def test_register_adds_entry(self):
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _P(EnginePlugin):
+            name = "my_plugin"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name="my_plugin", score=0.5)
+
+        registry = PluginRegistry()
+        registry.register(_P, status="experimental", weight=0.2)
+        assert "my_plugin" in registry
+        assert len(registry) == 1
+
+    def test_register_empty_name_raises(self):
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _P(EnginePlugin):
+            name = ""
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name="", score=0.0)
+
+        registry = PluginRegistry()
+        with pytest.raises(ValueError, match="name"):
+            registry.register(_P, status="experimental", weight=0.1)
+
+    def test_register_negative_weight_raises(self):
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _P(EnginePlugin):
+            name = "neg_plugin"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name="neg_plugin", score=0.0)
+
+        registry = PluginRegistry()
+        with pytest.raises(ValueError, match="poids"):
+            registry.register(_P, status="experimental", weight=-0.1)
+
+    def test_active_names_allow_experimental_true(self):
+        registry = self._make_registry_with_plugins()
+        active = registry.active_names(allow_experimental=True)
+        assert "valid_plugin" in active
+        assert "exp_plugin" in active
+        assert "dis_plugin" not in active
+
+    def test_active_names_allow_experimental_false(self):
+        registry = self._make_registry_with_plugins()
+        active = registry.active_names(allow_experimental=False)
+        assert active == ["valid_plugin"]
+
+    def test_validated_names(self):
+        registry = self._make_registry_with_plugins()
+        assert registry.validated_names() == ["valid_plugin"]
+
+    def test_run_all_returns_results(self, tmp_path):
+        registry = self._make_registry_with_plugins()
+        dummy = tmp_path / "file.mp4"
+        dummy.touch()
+        results = registry.run_all(dummy, allow_experimental=True)
+        assert "valid_plugin" in results
+        assert "exp_plugin" in results
+        assert "dis_plugin" not in results
+        assert results["valid_plugin"].score == 0.8
+        assert results["exp_plugin"].score == 0.4
+
+    def test_run_all_catches_engine_exception(self, tmp_path):
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _Crasher(EnginePlugin):
+            name = "crasher"
+            def analyze(self, f: Path) -> EngineResult:
+                raise RuntimeError("moteur en feu")
+
+        registry = PluginRegistry()
+        registry.register(_Crasher, status="validated", weight=1.0)
+        dummy = tmp_path / "x.mp4"
+        dummy.touch()
+        results = registry.run_all(dummy, allow_experimental=True)
+        assert results["crasher"].error == "moteur en feu"
+        assert results["crasher"].score == 0.0
+
+    def test_calibration_applied(self, tmp_path):
+        """La calibration Platt (a=2, b=-0.5) modifie le score brut."""
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _P(EnginePlugin):
+            name = "cal_plugin"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=0.5)
+
+        registry = PluginRegistry()
+        registry.register(_P, status="validated", weight=1.0, calibration={"a": 0.5, "b": 0.2})
+        dummy = tmp_path / "x.mp4"
+        dummy.touch()
+        results = registry.run_all(dummy, allow_experimental=False)
+        # 0.5*0.5 + 0.2 = 0.45
+        assert abs(results["cal_plugin"].score - 0.45) < 0.001
+
+    def test_calibration_clamped_to_0_1(self, tmp_path):
+        """La calibration ne peut pas sortir de [0, 1]."""
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _P(EnginePlugin):
+            name = "clamp_plugin"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=0.9)
+
+        registry = PluginRegistry()
+        registry.register(_P, status="validated", weight=1.0, calibration={"a": 2.0, "b": 0.5})
+        dummy = tmp_path / "x.mp4"
+        dummy.touch()
+        results = registry.run_all(dummy, allow_experimental=False)
+        # 2.0*0.9 + 0.5 = 2.3 → clampé à 1.0
+        assert results["clamp_plugin"].score == 1.0
+
+
+# ── Tests fuse_from_registry ──────────────────────────────────────────────────
+
+class TestFuseFromRegistry:
+    """Tests de fuse_from_registry() : fusion, abstention, SHAP."""
+
+    def _build_registry_and_results(self, scores: dict[str, float], statuses: dict[str, str]):
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        registry = PluginRegistry()
+        results: dict = {}
+
+        for name, score in scores.items():
+            status = statuses.get(name, "experimental")
+
+            class _P(EnginePlugin):
+                pass
+            _P.name = name
+
+            def _analyze(self, f: Path, _s=score) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=_s)
+            _P.analyze = _analyze
+
+            registry.register(_P, status=status, weight=1.0 / len(scores))
+            results[name] = EngineResult(engine_name=name, score=score)
+
+        return registry, results
+
+    def test_fusion_single_validated_engine_high_score(self):
+        from engines.fusion import fuse_from_registry
+        from models.analysis import Verdict
+
+        registry, results = self._build_registry_and_results(
+            {"vid": 0.8}, {"vid": "validated"}
+        )
+        result = fuse_from_registry(results, registry, allow_experimental=False)
+        assert result.verdict == Verdict.deepfake
+        assert result.final_score > 0.55
+
+    def test_fusion_two_experimental_engines(self):
+        from engines.fusion import fuse_from_registry
+        from models.analysis import Verdict
+
+        registry, results = self._build_registry_and_results(
+            {"a": 0.1, "b": 0.2}, {"a": "experimental", "b": "experimental"}
+        )
+        result = fuse_from_registry(results, registry, allow_experimental=True)
+        assert result.verdict == Verdict.authentic
+        assert result.final_score < 0.35
+
+    def test_abstain_when_no_validated_and_experimental_disabled(self):
+        """Sans moteur validated ET allow_experimental=False → Verdict.abstain."""
+        from engines.fusion import fuse_from_registry
+        from models.analysis import Verdict
+
+        registry, results = self._build_registry_and_results(
+            {"exp": 0.9}, {"exp": "experimental"}
+        )
+        result = fuse_from_registry(results, registry, allow_experimental=False)
+        assert result.verdict == Verdict.abstain
+        assert result.final_score == 0.0
+        assert result.shap_ranking == []
+
+    def test_abstain_empty_registry(self):
+        from engines.fusion import fuse_from_registry
+        from engines.registry import PluginRegistry
+        from models.analysis import Verdict
+
+        registry = PluginRegistry()
+        result = fuse_from_registry({}, registry, allow_experimental=True)
+        assert result.verdict == Verdict.abstain
+
+    def test_disabled_engine_excluded(self):
+        from engines.fusion import fuse_from_registry
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from models.analysis import Verdict
+        from pathlib import Path
+
+        class _D(EnginePlugin):
+            name = "disabled_eng"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=0.99)
+
+        registry = PluginRegistry()
+        registry.register(_D, status="disabled", weight=1.0)
+        # score élevé d'un moteur disabled ne doit pas affecter le verdict
+        results = {"disabled_eng": EngineResult(engine_name="disabled_eng", score=0.99)}
+        result = fuse_from_registry(results, registry, allow_experimental=True)
+        assert result.verdict == Verdict.abstain
+
+    def test_errored_engine_counted_as_zero(self):
+        from engines.fusion import fuse_from_registry
+        from engines.registry import PluginRegistry
+        from engines.plugin import EnginePlugin, EngineResult
+        from pathlib import Path
+
+        class _V(EnginePlugin):
+            name = "v_engine"
+            def analyze(self, f: Path) -> EngineResult:
+                return EngineResult(engine_name=self.name, score=0.8)
+
+        registry = PluginRegistry()
+        registry.register(_V, status="validated", weight=1.0)
+        # Simuler un moteur en erreur
+        results = {"v_engine": EngineResult(engine_name="v_engine", score=0.8, error="crash")}
+        result = fuse_from_registry(results, registry, allow_experimental=False)
+        # Moteur en erreur → score=0.0 → AUTHENTIQUE (score < 0.35)
+        assert result.final_score == 0.0
+        assert result.verdict.value != "DEEPFAKE DÉTECTÉ"
+
+    def test_shap_ranking_in_fuse_from_registry(self):
+        from engines.fusion import fuse_from_registry
+
+        registry, results = self._build_registry_and_results(
+            {"a": 0.8, "b": 0.2}, {"a": "validated", "b": "validated"}
+        )
+        result = fuse_from_registry(results, registry, allow_experimental=False)
+        features = [r["feature"] for r in result.shap_ranking]
+        assert "a" in features
+        assert "b" in features
+        total_contrib = sum(r["contribution"] for r in result.shap_ranking)
+        assert abs(total_contrib - 100.0) < 0.1
+
+
+# ── Tests Verdict.abstain dans fuse_scores ────────────────────────────────────
+
+class TestFuseScoresAbstention:
+    """Tests de l'abstention dans fuse_scores() quand aucun moteur actif."""
+
+    def test_abstain_when_all_disabled_and_no_experimental(self):
+        """Tous les moteurs désactivés + allow=False → Verdict.abstain."""
+        from engines.fusion import fuse_scores
+        from models.analysis import Verdict
+
+        all_disabled = {k: "disabled" for k in [
+            "texture", "temporal", "rppg", "biometrics", "audio", "phase", "metadata"
+        ]}
+        with patch("engines.fusion.settings") as mock_settings:
+            mock_settings.allow_experimental_engines = False
+            result = fuse_scores(engine_statuses=all_disabled)
+        assert result.verdict == Verdict.abstain
+        assert result.final_score == 0.0
+        assert result.shap_ranking == []
+        assert "Aucun moteur" in result.plain_explanation
+
+    def test_no_abstain_when_experimental_allowed(self):
+        """Moteurs experimental + allow=True → pas d'abstention."""
+        from engines.fusion import fuse_scores
+        from models.analysis import Verdict
+
+        with patch("engines.fusion.settings") as mock_settings:
+            mock_settings.allow_experimental_engines = True
+            result = fuse_scores()
+        assert result.verdict != Verdict.abstain
+
+    def test_abstain_score_is_zero(self):
+        from engines.fusion import fuse_scores
+        from models.analysis import Verdict
+
+        all_disabled = {k: "disabled" for k in [
+            "texture", "temporal", "rppg", "biometrics", "audio", "phase", "metadata"
+        ]}
+        with patch("engines.fusion.settings") as mock_settings:
+            mock_settings.allow_experimental_engines = False
+            result = fuse_scores(score_texture=0.9, engine_statuses=all_disabled)
+        assert result.verdict == Verdict.abstain
+        # Score élevé d'un moteur disabled ne doit pas polluer le résultat
+        assert result.final_score == 0.0
+
+    def test_verdict_abstain_value(self):
+        from models.analysis import Verdict
+        assert Verdict.abstain.value == "ABSTENTION"
+
+    def test_all_verdicts_present(self):
+        from models.analysis import Verdict
+        values = {v.value for v in Verdict}
+        assert "AUTHENTIQUE" in values
+        assert "INDÉTERMINÉ" in values
+        assert "DEEPFAKE DÉTECTÉ" in values
+        assert "ABSTENTION" in values

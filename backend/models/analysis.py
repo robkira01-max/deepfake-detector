@@ -17,6 +17,9 @@ class Verdict(str, enum.Enum):
     authentic = "AUTHENTIQUE"
     undetermined = "INDÉTERMINÉ"
     deepfake = "DEEPFAKE DÉTECTÉ"
+    # Aucun moteur actif — score non disponible (allow_experimental_engines=False
+    # et aucun moteur validated). Ne pas interpréter comme AUTHENTIQUE.
+    abstain = "ABSTENTION"
 
 
 class Analysis(Base):

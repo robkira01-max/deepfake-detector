@@ -16,10 +16,28 @@ Seuils de décision :
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from config import settings
 from models.analysis import Verdict
+
+# Chemin du fichier de métriques validé (CLAUDE.md Règle 7)
+_METRICS_PATH = Path(__file__).resolve().parents[2] / "evaluation" / "metrics" / "metrics.json"
+
+
+def _require_metrics() -> None:
+    """Lève ValueError si aucun metrics.json n'est disponible.
+
+    Appelée avant toute production de chiffre de fiabilité (FAR/FRR/AUC/EER).
+    CLAUDE.md Règle 7 : ValueError, pas None ni valeur par défaut.
+    """
+    if not _METRICS_PATH.exists():
+        raise ValueError(
+            f"Aucun artefact de métriques disponible ({_METRICS_PATH}). "
+            "Produire des chiffres de fiabilité sans metrics.json est interdit "
+            "(CLAUDE.md Règle 7). Voir evaluation/protocols/ pour la procédure de validation."
+        )
 
 EngineStatus = Literal["validated", "experimental", "disabled"]
 
@@ -69,11 +87,11 @@ class FusionResult:
     # Composantes incluses mais pas encore validées sur un jeu de test indépendant
     experimental_components: list[str] = field(default_factory=list)
 
-    # Métriques issues d'un jeu de test indépendant — None si non encore mesurées (Brief v3 §0.5)
-    model_far: float | None = None
-    model_frr: float | None = None
-    model_eer: float | None = None
-    model_auc: float | None = None
+    # Indicateur de disponibilité des artefacts de métriques (CLAUDE.md Règle 7)
+    # False tant que evaluation/metrics/metrics.json n'existe pas.
+    # Ne jamais retourner FAR/FRR/AUC/EER sans ce fichier — utiliser _require_metrics().
+    metrics_available: bool = False
+    metrics_artifact: str | None = None
 
 
 def fuse_scores(
@@ -116,6 +134,28 @@ def fuse_scores(
         k for k, s in statuses.items()
         if k in active_set and s == "experimental"
     )
+
+    # Abstention : 0 moteur actif → score indisponible (CLAUDE.md Règle 6)
+    # Se produit quand allow_experimental=False et aucun moteur validated.
+    # Ne pas retourner Verdict.authentic avec score=0.0 : ce serait trompeur.
+    if not active_set:
+        return FusionResult(
+            final_score=0.0,
+            verdict=Verdict.abstain,
+            confidence_low=0.0,
+            confidence_high=0.0,
+            component_scores={k: round(v, 4) for k, v in components.items()},
+            shap_ranking=[],
+            plain_explanation=(
+                "Aucun moteur de détection actif. "
+                "Activer allow_experimental_engines ou valider au moins un moteur "
+                "(CLAUDE.md Règle 6 + Règle 10) pour obtenir un score."
+            ),
+            unvalidated_components=excluded,
+            experimental_components=[],
+            metrics_available=_METRICS_PATH.exists(),
+            metrics_artifact=str(_METRICS_PATH) if _METRICS_PATH.exists() else None,
+        )
 
     # Score pondéré — composantes actives uniquement, poids renormalisés
     valid_weight_sum = sum(WEIGHTS[k] for k in active_set if k in WEIGHTS) or 1.0
@@ -164,6 +204,7 @@ def fuse_scores(
         verdict, final, shap_ranking, excluded, experimental
     )
 
+    metrics_available = _METRICS_PATH.exists()
     return FusionResult(
         final_score=round(final, 4),
         verdict=verdict,
@@ -174,6 +215,8 @@ def fuse_scores(
         plain_explanation=explanation,
         unvalidated_components=excluded,
         experimental_components=experimental,
+        metrics_available=metrics_available,
+        metrics_artifact=str(_METRICS_PATH) if metrics_available else None,
     )
 
 
@@ -237,3 +280,130 @@ def _generate_plain_explanation(
             f"Note : ce résultat doit être corroboré par d'autres éléments de preuve."
             f"{excl_note}{exp_note}"
         )
+
+
+# ── Fusion depuis le registre de greffons ────────────────────────────────────
+
+def fuse_from_registry(
+    results: dict,  # dict[str, EngineResult] — import local pour éviter circularité
+    registry,       # PluginRegistry
+    *,
+    allow_experimental: bool | None = None,
+) -> FusionResult:
+    """Calcule la fusion à partir des résultats d'un PluginRegistry.
+
+    Contrairement à fuse_scores(), cette fonction n'impose pas de noms de moteurs
+    prédéfinis — elle utilise les poids et statuts déclarés dans le registre.
+
+    Args:
+        results: dict {engine_name: EngineResult} retourné par registry.run_all().
+        registry: PluginRegistry avec les entrées enregistrées.
+        allow_experimental: Si None, utilise settings.allow_experimental_engines.
+
+    Returns:
+        FusionResult — avec Verdict.abstain si aucun moteur actif.
+    """
+    if allow_experimental is None:
+        allow_experimental = settings.allow_experimental_engines
+
+    entries = registry.entries()
+    active_names = registry.active_names(allow_experimental=allow_experimental)
+
+    # Partition exclu / expérimental
+    excluded_names = sorted(
+        name for name in entries if name not in active_names
+    )
+    experimental_names = sorted(
+        name for name in active_names
+        if entries[name].status == "experimental"
+    )
+
+    # Abstention si aucun moteur actif
+    if not active_names:
+        component_scores = {
+            name: round(r.score, 4) for name, r in results.items()
+        }
+        return FusionResult(
+            final_score=0.0,
+            verdict=Verdict.abstain,
+            confidence_low=0.0,
+            confidence_high=0.0,
+            component_scores=component_scores,
+            shap_ranking=[],
+            plain_explanation=(
+                "Aucun moteur de détection actif dans le registre. "
+                "Enregistrer un moteur validated ou activer allow_experimental_engines "
+                "(CLAUDE.md Règle 6 + Règle 10)."
+            ),
+            unvalidated_components=excluded_names,
+            experimental_components=[],
+            metrics_available=_METRICS_PATH.exists(),
+            metrics_artifact=str(_METRICS_PATH) if _METRICS_PATH.exists() else None,
+        )
+
+    # Score pondéré — poids renormalisés sur les moteurs actifs
+    valid_weight_sum = sum(
+        entries[name].weight for name in active_names if name in entries
+    ) or 1.0
+
+    final = 0.0
+    for name in active_names:
+        r = results.get(name)
+        score = r.score if (r and r.error is None) else 0.0
+        w = entries[name].weight if name in entries else 0.0
+        final += (w / valid_weight_sum) * score
+    final = max(0.0, min(1.0, final))
+
+    ic_low  = max(0.0, final - IC_HALF_WIDTH)
+    ic_high = min(1.0, final + IC_HALF_WIDTH)
+
+    if final < THRESHOLD_AUTHENTIC:
+        verdict = Verdict.authentic
+    elif final < THRESHOLD_DEEPFAKE:
+        verdict = Verdict.undetermined
+    else:
+        verdict = Verdict.deepfake
+
+    # Classement SHAP
+    weighted_scores = {
+        name: (entries[name].weight / valid_weight_sum) * (results[name].score if results.get(name) and not results[name].error else 0.0)
+        for name in active_names
+        if name in entries
+    }
+    total_w = sum(weighted_scores.values()) or 1.0
+    shap_ranking = sorted(
+        [
+            {
+                "feature":      name,
+                "contribution": round(v / total_w * 100, 1),
+                "raw_score":    round(results[name].score if results.get(name) else 0.0, 4),
+                "weight":       round(entries[name].weight / valid_weight_sum, 4),
+                "status":       entries[name].status,
+            }
+            for name, v in weighted_scores.items()
+        ],
+        key=lambda x: x["contribution"],
+        reverse=True,
+    )
+
+    explanation = _generate_plain_explanation(
+        verdict, final, shap_ranking, excluded_names, experimental_names
+    )
+
+    metrics_available = _METRICS_PATH.exists()
+    return FusionResult(
+        final_score=round(final, 4),
+        verdict=verdict,
+        confidence_low=round(ic_low, 4),
+        confidence_high=round(ic_high, 4),
+        component_scores={
+            name: round(results[name].score if results.get(name) else 0.0, 4)
+            for name in (*active_names, *excluded_names)
+        },
+        shap_ranking=shap_ranking,
+        plain_explanation=explanation,
+        unvalidated_components=excluded_names,
+        experimental_components=experimental_names,
+        metrics_available=metrics_available,
+        metrics_artifact=str(_METRICS_PATH) if metrics_available else None,
+    )
