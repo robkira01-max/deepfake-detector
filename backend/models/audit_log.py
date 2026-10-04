@@ -1,7 +1,9 @@
-"""Journal d'audit immuable — conçu pour soutenir l'admissibilité en preuve (LPC 31.3 | CAN/DGSI 120 [À VALIDER])."""
+"""Journal d'audit immuable — conçu pour soutenir l'admissibilité en preuve (LPC art. 31.1-31.6 | R. c. Mohan [1994] 2 RCS 9)."""
 import enum
+import hashlib
+import json
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, DateTime, Enum as SAEnum, ForeignKey, JSON, event
+from sqlalchemy import String, Text, DateTime, Enum as SAEnum, ForeignKey, JSON, event, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.exc import InvalidRequestError
 from database import Base
@@ -56,6 +58,14 @@ class AuditAction(str, enum.Enum):
     PROTOCOL_CONSUMED = "PROTOCOL_CONSUMED"
     # Statut de validation des engines (Brief v3 §6)
     ENGINE_STATUS_CHANGED = "ENGINE_STATUS_CHANGED"
+    # Export batch (v3.1)
+    BATCH_EXPORT_GENERATED = "BATCH_EXPORT_GENERATED"
+    CSV_EXPORT_GENERATED = "CSV_EXPORT_GENERATED"
+    # Webhooks (v3.1)
+    WEBHOOK_CREATED = "WEBHOOK_CREATED"
+    WEBHOOK_UPDATED = "WEBHOOK_UPDATED"
+    WEBHOOK_DELETED = "WEBHOOK_DELETED"
+    WEBHOOK_FIRED = "WEBHOOK_FIRED"
 
 
 class AuditLog(Base):
@@ -77,7 +87,10 @@ class AuditLog(Base):
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
-    # Intégrité de l'entrée
+    # Intégrité de l'entrée — chaîne SHA-256
+    # entry_hash = SHA-256(previous_entry_hash|timestamp|action|user_id|user_username|resource_type|resource_id|details_json)
+    # Calculé automatiquement par le listener before_insert — ne pas définir manuellement.
+    previous_entry_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entry_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     signature_b64: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -93,6 +106,67 @@ class AuditLog(Base):
         return f"<AuditLog id={self.id} action={self.action} user={self.user_username}>"
 
 
+def _compute_chain_hash(
+    previous_hash: str | None,
+    timestamp: datetime,
+    action: "AuditAction",
+    user_id: int | None,
+    user_username: str | None,
+    resource_type: str | None,
+    resource_id: str | None,
+    details: dict | None,
+) -> str:
+    """Calcule le hash de chaîne SHA-256 pour une entrée d'audit.
+
+    Le timestamp est normalisé en UTC naive avant isoformat() pour garantir
+    la cohérence entre l'insertion (aware) et la lecture depuis SQLite (naive).
+    """
+    # Normalise en UTC naive : SQLite stocke sans tzinfo, on veut le même résultat
+    ts_naive = timestamp.replace(tzinfo=None) if timestamp.tzinfo else timestamp
+    details_json = json.dumps(details, sort_keys=True, default=str) if details else "null"
+    content = "|".join([
+        str(previous_hash or ""),
+        ts_naive.isoformat(),
+        str(action.value if action else ""),
+        str(user_id or ""),
+        str(user_username or ""),
+        str(resource_type or ""),
+        str(resource_id or ""),
+        details_json,
+    ])
+    return hashlib.sha256(content.encode()).hexdigest()
+
+
+@event.listens_for(AuditLog, "before_insert")
+def _chain_audit_entry(mapper, connection, target: "AuditLog") -> None:
+    """Chaîne chaque entrée à la précédente avant INSERT.
+
+    Garantit que entry_hash = SHA-256(previous_entry_hash + contenu).
+    Résistance à la falsification : modifier une entrée casse tous les hash suivants.
+    Limite connue : les INSERTs concurrents peuvent lire le même previous_entry_hash.
+    Pour la production haute-concurrence, ajouter un verrou consultatif PostgreSQL.
+    """
+    if target.timestamp is None:
+        target.timestamp = datetime.now(timezone.utc)
+
+    row = connection.execute(
+        text("SELECT entry_hash FROM audit_logs ORDER BY id DESC LIMIT 1")
+    ).first()
+    prev_hash: str | None = row[0] if row else None
+    target.previous_entry_hash = prev_hash
+
+    target.entry_hash = _compute_chain_hash(
+        previous_hash=prev_hash,
+        timestamp=target.timestamp,
+        action=target.action,
+        user_id=target.user_id,
+        user_username=target.user_username,
+        resource_type=target.resource_type,
+        resource_id=target.resource_id,
+        details=target.details,
+    )
+
+
 @event.listens_for(AuditLog, "before_update")
 def _block_audit_update(mapper, connection, target):
     raise InvalidRequestError("AuditLog entries are immutable — updates are forbidden.")
@@ -101,3 +175,48 @@ def _block_audit_update(mapper, connection, target):
 @event.listens_for(AuditLog, "before_delete")
 def _block_audit_delete(mapper, connection, target):
     raise InvalidRequestError("AuditLog entries are immutable — deletes are forbidden.")
+
+
+def verify_audit_chain(db_session) -> tuple[bool, list[str]]:
+    """Vérifie l'intégrité de la chaîne du journal d'audit.
+
+    Retourne (True, []) si la chaîne est intacte.
+    Retourne (False, [erreurs]) si une entrée a été falsifiée ou un lien rompu.
+    """
+    from sqlalchemy.orm import Session
+
+    entries = db_session.query(AuditLog).order_by(AuditLog.id).all()
+    errors: list[str] = []
+    prev_hash: str | None = None
+
+    for entry in entries:
+        if entry.previous_entry_hash != prev_hash:
+            errors.append(
+                f"Entrée {entry.id} : lien rompu "
+                f"(attendu={prev_hash!r}, reçu={entry.previous_entry_hash!r})"
+            )
+
+        if entry.timestamp is None:
+            errors.append(f"Entrée {entry.id} : timestamp absent")
+            prev_hash = entry.entry_hash
+            continue
+
+        expected = _compute_chain_hash(
+            previous_hash=prev_hash,
+            timestamp=entry.timestamp,
+            action=entry.action,
+            user_id=entry.user_id,
+            user_username=entry.user_username,
+            resource_type=entry.resource_type,
+            resource_id=entry.resource_id,
+            details=entry.details,
+        )
+        if entry.entry_hash != expected:
+            errors.append(
+                f"Entrée {entry.id} : entry_hash falsifié "
+                f"(attendu={expected[:16]}…, reçu={str(entry.entry_hash)[:16]}…)"
+            )
+
+        prev_hash = entry.entry_hash
+
+    return len(errors) == 0, errors

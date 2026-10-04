@@ -78,7 +78,7 @@
 <!-- §1 — IDENTIFICATION ET CHAÎNE DE POSSESSION -->
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
 <h2><span class="section-num">§1</span> — Identification et chaîne de possession numérique</h2>
-<p class="legal-ref">Conforme : {{ lpc_reference }} | {{ dgsi_reference }}</p>
+<p class="legal-ref">Conforme : {{ lpc_reference }} | {{ c2pa_reference }}</p>
 <table>
   <tr><th colspan="2">Fichier soumis à l'analyse</th></tr>
   <tr><td>Nom original</td><td>{{ media_file.original_filename }}</td></tr>
@@ -87,7 +87,7 @@
   <tr><td>UUID de traçabilité</td><td class="hash-block">{{ media_file.uuid }}</td></tr>
   <tr><td>Empreinte SHA-256</td><td class="hash-block">{{ media_file.hash_sha256 }}</td></tr>
   <tr><td>Empreinte BLAKE3</td><td class="hash-block">{{ media_file.hash_blake3 }}</td></tr>
-  <tr><td>Empreinte MD5 (compatibilité)</td><td class="hash-block">{{ media_file.hash_md5 }}</td></tr>
+  <!-- MD5 retiré — aucune valeur probatoire (CLAUDE.md Règle 2) -->
   <tr><td>Horodatage TSA (RFC 3161)</td><td>{{ tsa_timestamp }}</td></tr>
   <tr><td>Autorité TSA</td><td>{{ tsa_authority }}</td></tr>
   <tr><td>Date d'ingestion</td><td>{{ media_file.ingested_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}</td></tr>
@@ -288,7 +288,7 @@
     <li>{{ lpc_reference }}</li>
     <li>{{ mohan_reference }}</li>
     <li>{{ jlj_reference }}</li>
-    <li>{{ dgsi_reference }}</li>
+    <li>{{ c2pa_reference }}</li>
     <li>ISO 19005-3 (PDF/A-3) — Archivage légal</li>
     <li>RFC 3161 — Protocole d'horodatage certifié</li>
   </ul>

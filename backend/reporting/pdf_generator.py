@@ -285,7 +285,7 @@ def _build_context(
         "lpc_reference": "Loi sur la preuve au Canada, LRC 1985, c C-5, art. 31.1–31.6",
         "mohan_reference": "R. c. Mohan [1994] 2 RCS 9",
         "jlj_reference": "R. c. J.-L.J. [2000] 2 RCS 600",
-        "dgsi_reference": "CAN/DGSI 120 [À VALIDER] — Digital Governance Standards Institute",
+        "c2pa_reference": "C2PA Specification 1.3 — Content Credentials (Coalition for Content Provenance and Authenticity)",
         "tsa_authority": getattr(media_file, "tsa_authority", None) or "Non disponible",
         # models_used
         "models_used": analysis.models_used or {},

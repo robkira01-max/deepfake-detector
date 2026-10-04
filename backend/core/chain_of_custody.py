@@ -1,7 +1,8 @@
-"""Chaîne de possession numérique — LPC art. 31.1-31.6 + CAN/DGSI 120 [À VALIDER].
+"""Chaîne de possession numérique — LPC art. 31.1-31.6 (a_valider) + R. c. Mohan [1994] 2 RCS 9.
 
 Responsabilités :
-  - Calcul d'empreintes SHA-256, BLAKE3, MD5
+  - Calcul d'empreintes SHA-256 (probatoire, envoyé au TSA) + BLAKE3 (performance/déduplication)
+  - MD5 retiré — aucune valeur probatoire (CLAUDE.md Règle 2)
   - Horodatage certifié RFC 3161 (TSA)
   - Signature des entrées d'audit (RSA-4096)
   - Vérification d'intégrité à la demande
@@ -32,41 +33,45 @@ _CHUNK_SIZE = 4 * 1024 * 1024
 
 
 class HashBundle:
-    """Empreintes cryptographiques d'un fichier."""
+    """Empreintes cryptographiques d'un fichier.
 
-    def __init__(self, sha256: str, blake3: str, md5: str, file_size: int) -> None:
+    SHA-256 : empreinte probatoire — envoyée au TSA RFC 3161.
+    Blake3  : performance et déduplication.
+    MD5 retiré : aucune valeur probatoire (CLAUDE.md Règle 2).
+    """
+
+    def __init__(self, sha256: str, blake3: str, file_size: int) -> None:
         self.sha256 = sha256
         self.blake3 = blake3
-        self.md5 = md5
         self.file_size = file_size
 
     def to_dict(self) -> dict:
         return {
             "sha256": self.sha256,
             "blake3": self.blake3,
-            "md5": self.md5,
             "file_size_bytes": self.file_size,
         }
 
 
 def compute_hashes(file_path: Path) -> HashBundle:
-    """Calcule SHA-256, BLAKE3 et MD5 en un seul passage sur le fichier."""
+    """Calcule SHA-256 (probatoire) + BLAKE3 (perf) en un seul passage.
+
+    MD5 retiré — aucune valeur probatoire (CLAUDE.md Règle 2).
+    SHA-256 est l'empreinte envoyée au TSA RFC 3161.
+    """
     h_sha256 = hashlib.sha256()
     h_blake3 = _blake3.blake3()
-    h_md5 = hashlib.md5(usedforsecurity=False)  # nosec B324 — MD5 pour interopérabilité légale uniquement, pas pour sécurité
     total = 0
 
     with file_path.open("rb") as fh:
         while chunk := fh.read(_CHUNK_SIZE):
             h_sha256.update(chunk)
             h_blake3.update(chunk)
-            h_md5.update(chunk)
             total += len(chunk)
 
     bundle = HashBundle(
         sha256=h_sha256.hexdigest(),
         blake3=h_blake3.hexdigest(),
-        md5=h_md5.hexdigest(),
         file_size=total,
     )
     log.info("hashes_computed", sha256=bundle.sha256[:16] + "...", size_bytes=total)

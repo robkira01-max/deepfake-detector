@@ -1,0 +1,144 @@
+schema_version: "1.1"
+last_updated: "2026-10-04"
+
+description: >
+  Source unique de vérité pour toutes les références légales et normatives
+  citées dans le code, les rapports et la documentation.
+  CLAUDE.md Règle 9 : aucune norme ou loi ne doit être écrite en dur ailleurs.
+  Un élément marqué status: a_valider ne doit JAMAIS apparaître dans un rapport émis.
+
+  Champ usage :
+    judicial    — admissibilité en preuve / forensique judiciaire
+    kyc         — vérification d'identité / KYC / AML
+    elections   — infractions électorales
+    all         — tous usages
+
+references:
+
+  - id: LPC-31.1
+    type: loi
+    titre: "Loi sur la preuve au Canada, art. 31.1–31.6 — Authentification des documents électroniques"
+    titre_en: "Canada Evidence Act, ss. 31.1–31.6 — Authentication of electronic documents"
+    citation_formelle: "L.R.C. 1985, ch. C-5, art. 31.1–31.6"
+    jurisdiction: federal
+    usage: judicial
+    status: a_valider
+    notes: >
+      Vérifier la version consolidée en vigueur sur laws-lois.justice.gc.ca.
+      Art. 31.1 définit l'authenticité d'un document électronique (intégrité + origine).
+      Art. 31.3 : présomption d'authenticité si le système fonctionne correctement.
+      Art. 31.5–31.6 : transfert et copies électroniques. À valider avec un juriste avant
+      usage dans un rapport émis au tribunal.
+
+  - id: R-c-Mohan
+    type: jurisprudence
+    titre: "R. c. Mohan, [1994] 2 RCS 9"
+    titre_en: "R. v. Mohan, [1994] 2 SCR 9"
+    citation_formelle: "[1994] 2 RCS 9, [1994] 2 SCR 9"
+    jurisdiction: federal
+    usage: judicial
+    status: confirme
+    criteres_admissibilite:
+      - "Pertinence : le témoignage doit être logiquement pertinent à un fait en litige"
+      - "Nécessité : le témoignage d'expert est nécessaire pour apprécier la preuve"
+      - "Absence de règle d'exclusion : aucune règle de droit n'exclut le témoignage"
+      - "Qualification suffisante de l'expert : formation, expérience, connaissances suffisantes"
+    notes: >
+      Critères d'admissibilité de la preuve d'expert devant les tribunaux canadiens.
+      Appliqué conjointement avec Daubert (pour les juridictions appliquant ce test).
+      Référence primaire pour toute preuve forensique numérique soumise à un tribunal canadien.
+
+  - id: LPRPDE
+    type: loi
+    titre: "Loi sur la protection des renseignements personnels et les documents électroniques (LPRPDE/PIPEDA)"
+    citation_formelle: "L.C. 2000, ch. 5"
+    jurisdiction: federal
+    usage: kyc
+    status: a_valider
+    notes: >
+      Confirmer les modifications récentes via le Commissariat à la vie privée du Canada.
+      Applicable au traitement de données biométriques dans le module KYC.
+      Note : au Québec, la Loi 25 (Loi modernisant des dispositions législatives en matière de
+      protection des renseignements personnels, RLRQ c. P-39.1) s'applique également.
+
+  - id: LRPCFAT
+    type: loi
+    titre: "Loi sur le recyclage des produits de la criminalité et le financement des activités terroristes (LRPCFAT/PCMLTFA)"
+    citation_formelle: "L.C. 2000, ch. 17"
+    jurisdiction: federal
+    usage: kyc
+    status: a_valider
+    notes: "Vérifier les obligations KYC élargies via guidance.fintrac-canafe.gc.ca."
+
+  - id: C-25
+    type: loi
+    titre: "Loi C-25 — Strong and Free Elections Act / Loi sur les élections fortes et libres"
+    titre_en: "An Act to amend the Canada Elections Act"
+    citation_formelle: "Loi modifiant la Loi électorale du Canada (C-25), 45e Parl., 1re sess."
+    jurisdiction: federal
+    usage: elections
+    status: confirme
+    date_sanction_royale: "2026-06-18"
+    session_parlementaire: "45e Parlement, 1re session"
+    disposition_deepfake: >
+      Modifie l'art. 480.1 de la Loi électorale du Canada (infraction d'usurpation d'identité)
+      pour couvrir les fausses représentations faites par moyens technologiques : image de synthèse,
+      imitation vocale, enregistrement audio d'un acteur électoral, distribué avec intention d'induire
+      en erreur. Défense : parodie ou satire manifeste. S'applique hors période électorale et hors Canada.
+    notes: >
+      Sanction royale confirmée le 18 juin 2026. La loi crée une infraction pénale — non un
+      marché de détection. Vérifier le texte consolidé sur laws-lois.justice.gc.ca pour le
+      règlement d'application.
+
+  - id: CPCivQ-282-293
+    type: loi
+    titre: "Code de procédure civile du Québec, art. 282–293 — Preuve par écrit et documents technologiques"
+    titre_en: "Code of Civil Procedure of Quebec, arts. 282–293"
+    citation_formelle: "RLRQ c. C-25.01, art. 282–293"
+    jurisdiction: quebec
+    usage: judicial
+    status: a_valider
+    notes: >
+      Les articles 282–293 du CPCivQ concernent la preuve par écrit et les documents
+      technologiques. Les numéros d'articles exacts et leur portée sur les documents
+      électroniques forensiques doivent être confirmés par un juriste québécois avant
+      toute citation dans un rapport émis à un tribunal québécois. La Loi concernant le
+      cadre juridique des technologies de l'information (LCCJTI, RLRQ c. C-1.1) est
+      également pertinente.
+
+  - id: RFC-3161
+    type: norme
+    titre: "RFC 3161 — Internet X.509 PKI Time-Stamp Protocol (TSP)"
+    usage: judicial
+    status: confirme
+    notes: "Standard IETF pour l'horodatage certifié. Utilisé pour la chaîne de possession (TSA)."
+
+  - id: CAN-DGSI-120
+    type: norme
+    titre: "CAN/DGSI 120 — Gestion de l'information numérique légalement admissible"
+    jurisdiction: federal
+    usage: kyc
+    status: a_valider
+    avertissement: >
+      ⚠️ USAGE RESTREINT AU MODULE KYC. Ce programme de travail du DGSI concerne
+      l'authentification biométrique (comité Biométrie), PAS la forensique judiciaire
+      ni la chaîne de possession numérique. Ne pas citer dans les rapports judiciaires.
+      Pour la forensique judiciaire, utiliser LPC-31.1 et R-c-Mohan.
+    notes: >
+      Vérifier la version en vigueur et l'autorité normative auprès du CST/DGSI.
+      Pertinent uniquement pour le module d'authentification biométrique (KYC).
+
+  - id: ITSG-33
+    type: guide
+    titre: "ITSG-33 — Gestion des risques liés à la sécurité des TI"
+    jurisdiction: federal
+    usage: kyc
+    status: a_valider
+    notes: "Applicable si contrat avec un organisme fédéral. Confirmer via CCCS."
+
+  - id: C2PA-1.3
+    type: norme
+    titre: "C2PA Specification 1.3 — Content Credentials"
+    usage: judicial
+    status: confirme
+    notes: "Standard Coalition for Content Provenance and Authenticity. Utilisé par C2PAEngine."

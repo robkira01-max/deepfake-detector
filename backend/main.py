@@ -169,9 +169,9 @@ _OPENAPI_DESCRIPTION = """
 Plateforme d'analyse forensique deepfake audio/vidéo pour le système judiciaire canadien.
 
 ### Conformité légale
-- **LPC art. 31.1–31.6** — Authenticité et intégrité des documents électroniques
+- **LPC art. 31.1–31.6 [à valider]** — Authenticité et intégrité des documents électroniques
 - **R. c. Mohan [1994] 2 RCS 9** — Critères d'admissibilité des preuves d'expert
-- **CAN/DGSI 120 [À VALIDER]** — Forensique numérique — Meilleures pratiques
+- **C2PA 1.3** — Provenance cryptographique (Content Credentials)
 
 ### Authentification
 Toutes les routes protégées requièrent un token JWT RS256 via header :
@@ -339,5 +339,5 @@ def root() -> dict:
         "message": "DeepfakeDetector Canada API",
         "docs": "/docs",
         "health": "/health",
-        "legal": "Conçu pour soutenir l'admissibilité en preuve | LPC 31.1-31.6 | R. c. Mohan [1994] 2 RCS 9 | CAN/DGSI 120 [À VALIDER]",
+        "legal": "Conçu pour soutenir l'admissibilité en preuve | LPC art. 31.1-31.6 [à valider] | R. c. Mohan [1994] 2 RCS 9 | C2PA 1.3",
     }
