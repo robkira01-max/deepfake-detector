@@ -17,7 +17,12 @@ if str(_backend) not in sys.path:
     sys.path.insert(0, str(_backend))
 
 # ── 2. Env vars avant tout import app ─────────────────────────────────────────
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+# TEST_DATABASE_URL permet au CI PostgreSQL de surcharger SQLite.
+# Valeur par défaut : SQLite in-memory (dev local rapide).
+_TEST_DB_URL: str = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
+os.environ["DATABASE_URL"] = _TEST_DB_URL
+_IS_SQLITE: bool = _TEST_DB_URL.startswith("sqlite")
+
 os.environ.setdefault("JWT_PRIVATE_KEY_PATH", str(_backend / "keys" / "private.pem"))
 os.environ.setdefault("JWT_PUBLIC_KEY_PATH", str(_backend / "keys" / "public.pem"))
 os.environ.setdefault("AUDIT_SIGNING_KEY_PATH", str(_backend / "keys" / "audit_private.pem"))
@@ -25,7 +30,8 @@ os.environ["DEBUG"] = "true"
 os.environ["MFA_REQUIRED"] = "false"
 os.environ["APP_ENV"] = "test"
 
-# ── 3. Patch create_engine pour SQLite (pas de pool_size/max_overflow) ─────────
+# ── 3. Patch create_engine (SQLite uniquement) ─────────────────────────────────
+# PostgreSQL accepte pool_size/max_overflow — pas besoin de les retirer.
 import itertools as _itertools
 import sqlalchemy
 from sqlalchemy import create_engine as _real_ce
@@ -36,7 +42,8 @@ def _sqlite_engine(url, **kwargs):
     kwargs.pop("pool_pre_ping", None)
     return _real_ce(url, connect_args={"check_same_thread": False}, **kwargs)
 
-sqlalchemy.create_engine = _sqlite_engine
+if _IS_SQLITE:
+    sqlalchemy.create_engine = _sqlite_engine
 
 # ── Patch slowapi rate limiter en mode test ────────────────────────────────────
 # Chaque test reçoit une "IP" unique → pas de partage de quota entre tests
@@ -67,27 +74,47 @@ from core.security import hash_password, create_access_token  # noqa: E402
 from models import training_protocol as _training_protocol_module  # noqa: F401, E402
 
 
-# ── Base de données en mémoire ────────────────────────────────────────────────
+# ── Moteur de base de données ─────────────────────────────────────────────────
 
 @pytest.fixture(scope="session")
 def engine():
-    """Moteur SQLite en mémoire partagé pour la session de test."""
-    _engine = _sqlite_engine("sqlite:///:memory:")
+    """Moteur DB partagé pour la session de test.
+
+    - SQLite in-memory par défaut (dev local, rapide).
+    - PostgreSQL quand TEST_DATABASE_URL est défini (CI).
+    """
+    if _IS_SQLITE:
+        _engine = _sqlite_engine("sqlite:///:memory:")
+    else:
+        _engine = _real_ce(_TEST_DB_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
     Base.metadata.create_all(bind=_engine)
     yield _engine
+    if not _IS_SQLITE:
+        # Nettoyage schéma en fin de run CI — évite les conflits de schéma entre runs
+        Base.metadata.drop_all(bind=_engine)
     _engine.dispose()
 
 
 @pytest.fixture(scope="function")
 def db(engine) -> Generator[Session, None, None]:
-    """Session DB fraîche pour chaque test — rollback automatique."""
+    """Session DB fraîche pour chaque test — rollback automatique.
+
+    SQLite : rollback de transaction classique.
+    PostgreSQL : SAVEPOINT (begin_nested) pour isolation sans toucher aux autres tests.
+    """
     connection = engine.connect()
     transaction = connection.begin()
-    TestingSessionLocal = sessionmaker(bind=connection)
+    if not _IS_SQLITE:
+        # Nested transaction = SAVEPOINT dans PostgreSQL
+        nested = connection.begin_nested()
+    TestingSessionLocal = sessionmaker(bind=connection, autoflush=False)
     session = TestingSessionLocal()
     yield session
     session.close()
     try:
+        if not _IS_SQLITE:
+            if nested.is_active:
+                nested.rollback()
         transaction.rollback()
     except Exception:
         pass
