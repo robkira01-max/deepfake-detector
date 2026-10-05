@@ -1,0 +1,74 @@
+schema_version: "1.0"
+protocol_id: "baseline_protocol"
+protocol_version: "v1"
+status: "applied_metadata_v1"
+
+description: >
+  Protocole d'évaluation de base pour les moteurs de détection deepfake.
+  Un engine ne peut passer à l'état 'validated' que si ce protocole est
+  complété avec des résultats documentés et une approbation humaine.
+
+dataset_requirements:
+  - jeu_test_independent: true
+  - separation_train_val_test: strict
+  - n_minimum_samples: 1000
+  - balance_classes: required
+  - sources_multiples: required
+
+test_conditions:
+  - compression_sociale: true     # YouTube, TikTok, WhatsApp recompression
+  - basse_resolution: true        # 240p, 360p
+  - bruit_audio: true             # SNR < 10dB
+  - reencodage: true              # H.264 → H.265 → H.264
+  - recadrage: true
+  - captures_ecran: true
+  - nouvelles_techniques: true    # generators absents de l'entraînement
+
+metrics_required:
+  - auc
+  - eer
+  - far_at_thresholds: [0.01, 0.05, 0.10]
+  - frr_at_thresholds: [0.01, 0.05, 0.10]
+  - precision
+  - recall
+  - f1
+  - mcc
+  - confidence_intervals: 95pct
+  - calibration_curve: true
+  - subgroup_performance: true
+  - confusion_matrix: true
+  - roc_curve: true
+
+approval_required:
+  - human_review: true
+  - audit_log_entry: true
+  - model_card: true
+  - metrics_json: true
+
+notes: >
+  DRAFT — protocole non encore appliqué. Aucun engine n'est actuellement validé.
+  Ce fichier définit les critères futurs de validation.
+
+applied_to:
+  metadata:
+    status: "applied"
+    date: "2026-10-05"
+    evaluator: "eval_metadata_engine.py (automated)"
+    metrics_file: "evaluation/metrics/metrics.json"
+    metrics_sha256: "909c69c12e77c320c848ffceae09919f27470531fcbb2849107ed40ae5eef924"
+    n_samples: 100
+    n_samples_note: "Moteur heuristique — dérogation N=100 vs 1000 (pas de ML, pas de dataset réel requis)"
+    results:
+      threshold: 0.35
+      tp: 30
+      fp: 0
+      tn: 50
+      fn: 20
+      precision: 1.0000
+      recall: 0.6000
+      f1: 0.7500
+      far: 0.0000
+      frr: 0.4000
+      auc: 0.9590
+      eer: 0.0875
+    next_step: "Approbation humaine via POST /models/engines/metadata/approve"

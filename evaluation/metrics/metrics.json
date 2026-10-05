@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "engine_name": "metadata",
+  "model_version": "v1.0.0",
+  "protocol_hash": "4a667dd5b9493be3abf86490733c738b8ca82fcb1ebd9d7146766ceca92e8f50",
+  "train_dataset": {
+    "name": "metadata_heuristic_rules_v1",
+    "version": "1.0",
+    "split": "train",
+    "n_samples": 16,
+    "n_identities": 1,
+    "source_hash": "405aecf5d9e4ae6e2cd6b46ec231926df4aa8db75ecb773b69491ce46c9a628d"
+  },
+  "test_dataset": {
+    "name": "metadata_synthetic_testset_v1",
+    "version": "1.0",
+    "split": "test",
+    "n_samples": 100,
+    "n_identities": 50,
+    "source_hash": null
+  },
+  "far": 0.0,
+  "frr": 0.4,
+  "eer": 0.0875,
+  "auc": 0.959,
+  "threshold_used": 0.35,
+  "evaluated_at": "2026-10-05T22:03:44.527712Z",
+  "evaluator": "eval_metadata_engine.py (automated)",
+  "evaluation_environment": "Python 3.14.7, heuristic engine (no GPU)",
+  "notes": "Moteur heuristique (pas de ML). Jeu de test synthétique N=100 (< 1000 minimum protocolaire prévu pour engines ML). Limite principale : contournable si l'attaquant efface/forge les métadonnées. Recall limité aux deepfakes portant des signatures d'outils dans les métadonnées. AUC et EER calculés sur distribution bimodale (signatures vs pas de signature)."
+}

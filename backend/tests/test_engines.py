@@ -97,11 +97,16 @@ class TestFusionEngine:
         if THRESHOLD_AUTHENTIC <= result.final_score < THRESHOLD_DEEPFAKE:
             assert result.verdict == Verdict.undetermined
 
-    def test_model_metrics_none_until_validated(self):
+    def test_model_metrics_none_until_validated(self, tmp_path):
+        from unittest.mock import patch
+        import engines.fusion as fusion_mod
         from engines.fusion import fuse_scores
 
-        result = fuse_scores()
-        # Brief v2 P0.2 : métriques indisponibles jusqu'à validation sur jeu de test indépendant
+        # Simule l'absence de metrics.json (état avant validation)
+        absent_path = tmp_path / "metrics.json"
+        with patch.object(fusion_mod, "_METRICS_PATH", absent_path):
+            result = fuse_scores()
+        # Brief v2 P0.2 : métriques indisponibles sans metrics.json
         assert result.metrics_available is False
         assert result.metrics_artifact is None
 

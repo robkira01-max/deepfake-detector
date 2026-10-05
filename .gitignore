@@ -55,4 +55,9 @@ data/datasets/
 data/metrics/
 data/models/
 data/protocols/
-training/
+# training/ : seuls les sous-dossiers de données sont exclus ; les .py sont versionnés
+training/data/
+training/datasets/
+training/runs/
+training/checkpoints/
+training/exports/
