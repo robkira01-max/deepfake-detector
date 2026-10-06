@@ -46,7 +46,7 @@ def _make_media(
         status=MediaStatus.quarantine,
         hash_sha256="a" * 64,
         hash_blake3="b" * 64,
-        hash_md5="c" * 32,
+        
         ingested_by_id=user.id,
         storage_key="/tmp/test_evidence.mp4" if with_storage_key else None,
     )

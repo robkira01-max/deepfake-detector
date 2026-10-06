@@ -45,7 +45,7 @@ def _make_media(db: Session, case: Case) -> MediaFile:
         status=MediaStatus.quarantine,
         hash_sha256="a" * 64,
         hash_blake3="b" * 64,
-        hash_md5="c" * 32,
+        
         ingested_by_id=case.created_by_id,
     )
     db.add(mf)

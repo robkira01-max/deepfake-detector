@@ -39,9 +39,13 @@ class MediaFile(Base):
     )
 
     # Empreintes cryptographiques (Chain of Custody)
+    # SHA-256 : empreinte probatoire — envoyée au TSA RFC 3161
+    # Blake3  : performance et déduplication
     hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     hash_blake3: Mapped[str] = mapped_column(String(64), nullable=False)
-    hash_md5: Mapped[str] = mapped_column(String(32), nullable=False)
+    # DÉPRÉCIÉ — MD5 interdit (CLAUDE.md Règle 2) : aucune valeur probatoire.
+    # Colonne conservée nullable pour rétrocompatibilité DB uniquement. Ne pas écrire.
+    hash_md5: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
 
     # Horodatage TSA RFC 3161
     tsa_token_b64: Mapped[str | None] = mapped_column(Text, nullable=True)

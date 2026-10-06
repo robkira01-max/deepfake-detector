@@ -52,8 +52,8 @@ class TestHashComputation:
         d = compute_hashes(f).to_dict()
         assert "sha256" in d
         assert "blake3" in d
-        assert "md5" in d
         assert "file_size_bytes" in d
+        assert "md5" not in d  # MD5 retiré — CLAUDE.md Règle 2
 
     def test_large_file_chunked(self, tmp_path: Path):
         """Vérifier que les gros fichiers (>4MB) sont traités correctement."""

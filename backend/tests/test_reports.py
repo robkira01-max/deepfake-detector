@@ -46,7 +46,7 @@ def _make_media(db: Session, case: Case) -> MediaFile:
         status=MediaStatus.quarantine,
         hash_sha256="a" * 64,
         hash_blake3="b" * 64,
-        hash_md5="c" * 32,
+        
         ingested_by_id=case.created_by_id,
     )
     db.add(mf)
@@ -93,46 +93,57 @@ def _make_report(db: Session, case: Case, analysis: Analysis, user: User, pdf_ex
 
 # ── Tests encryption ───────────────────────────────────────────────────────────
 
+def _aes_key() -> str:
+    """Génère une clé AES-256 encodée base64url pour les tests."""
+    import base64
+    return base64.urlsafe_b64encode(b"\xAB" * 32).decode()
+
+
 class TestEncryption:
-    def test_encrypt_decrypt_roundtrip_no_fernet(self):
-        """Sans clé Fernet configurée, encrypt/decrypt sont des no-ops."""
+    def test_encrypt_decrypt_roundtrip_no_key(self):
+        """Sans clé AES configurée, encrypt/decrypt sont des no-ops."""
         import core.encryption as enc_module
         with mock.patch.object(enc_module, "settings") as m:
-            m.fernet = None
+            m.encryption_key = ""
             plaintext = "my_secret_totp_key"
             encrypted = enc_module.encrypt_secret(plaintext)
             assert encrypted == plaintext
             decrypted = enc_module.decrypt_secret(encrypted)
             assert decrypted == plaintext
 
-    def test_encrypt_decrypt_with_fernet(self):
-        """Avec clé Fernet, les données sont chiffrées puis déchiffrées correctement."""
-        from cryptography.fernet import Fernet
-        key = Fernet.generate_key().decode()
-        with mock.patch("core.encryption.settings") as m:
-            m.fernet = Fernet(key.encode())
-            from core.encryption import encrypt_secret, decrypt_secret
+    def test_encrypt_decrypt_with_aes_gcm(self):
+        """Avec clé AES-256-GCM, les données sont chiffrées puis déchiffrées correctement."""
+        import core.encryption as enc_module
+        with mock.patch.object(enc_module, "settings") as m:
+            m.encryption_key = _aes_key()
             plaintext = "super_secret_mfa_key_AAABBBCCC"
-            encrypted = encrypt_secret(plaintext)
+            encrypted = enc_module.encrypt_secret(plaintext)
             assert encrypted != plaintext
-            decrypted = decrypt_secret(encrypted)
+            decrypted = enc_module.decrypt_secret(encrypted)
             assert decrypted == plaintext
 
     def test_decrypt_invalid_ciphertext_returns_ciphertext(self):
-        """Une valeur non chiffrée est retournée telle quelle si Fernet ne peut pas la déchiffrer."""
-        from cryptography.fernet import Fernet
-        key = Fernet.generate_key().decode()
-        with mock.patch("core.encryption.settings") as m:
-            m.fernet = Fernet(key.encode())
-            from core.encryption import decrypt_secret
-            result = decrypt_secret("not_encrypted_at_all")
-            assert result == "not_encrypted_at_all"
-
-    def test_encrypt_empty_string_no_fernet(self):
+        """Une valeur non chiffrée est retournée telle quelle si AES-GCM ne peut pas la déchiffrer."""
         import core.encryption as enc_module
         with mock.patch.object(enc_module, "settings") as m:
-            m.fernet = None
+            m.encryption_key = _aes_key()
+            result = enc_module.decrypt_secret("not_encrypted_at_all")
+            assert result == "not_encrypted_at_all"
+
+    def test_encrypt_empty_string_no_key(self):
+        import core.encryption as enc_module
+        with mock.patch.object(enc_module, "settings") as m:
+            m.encryption_key = ""
             assert enc_module.encrypt_secret("") == ""
+
+    def test_nonce_uniqueness(self):
+        """Deux chiffrements du même plaintext donnent des ciphertexts différents."""
+        import core.encryption as enc_module
+        with mock.patch.object(enc_module, "settings") as m:
+            m.encryption_key = _aes_key()
+            c1 = enc_module.encrypt_secret("hello")
+            c2 = enc_module.encrypt_secret("hello")
+            assert c1 != c2
 
 
 # ── Tests token_blocklist ──────────────────────────────────────────────────────

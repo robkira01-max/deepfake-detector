@@ -372,7 +372,7 @@ class TestStatsWithAnalysis:
             status=MediaStatus.verified,
             hash_sha256="a" * 64,
             hash_blake3="b" * 64,
-            hash_md5="c" * 32,
+            
             ingested_by_id=analyst_user.id,
         )
         db.add(mf)

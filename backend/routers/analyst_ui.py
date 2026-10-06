@@ -197,6 +197,141 @@ def dashboard(
     })
 
 
+# ── Analytics ────────────────────────────────────────────────────────────────
+
+@router.get("/analytics", response_class=HTMLResponse)
+def analytics(
+    request: Request,
+    user: User = Depends(_get_analyst_from_cookie),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    import json, statistics
+
+    # ── Verdicts ──────────────────────────────────────────────────────────────
+    from collections import defaultdict
+    from datetime import datetime as _dt
+
+    completed = (
+        db.query(Analysis)
+        .filter(Analysis.status == AnalysisStatus.completed)
+        .order_by(Analysis.completed_at.desc())
+        .all()
+    )
+
+    deepfake_count = sum(1 for a in completed if a.verdict == Verdict.deepfake)
+    authentic_count = sum(1 for a in completed if a.verdict == Verdict.authentic)
+    undetermined_count = sum(1 for a in completed if a.verdict not in (Verdict.deepfake, Verdict.authentic))
+    total_analyses = len(completed)
+    deepfake_rate = round(deepfake_count / total_analyses * 100, 1) if total_analyses else 0.0
+
+    verdict_dist = [
+        {"label": "Deepfakes détectés", "count": deepfake_count,    "color": "#ff4757", "pct": round(deepfake_count / total_analyses * 100, 1) if total_analyses else 0},
+        {"label": "Authentiques",        "count": authentic_count,   "color": "#00e676", "pct": round(authentic_count / total_analyses * 100, 1) if total_analyses else 0},
+        {"label": "Indéterminés",        "count": undetermined_count, "color": "#ffc107", "pct": round(undetermined_count / total_analyses * 100, 1) if total_analyses else 0},
+    ]
+    verdict_chart = {
+        "labels": [v["label"] for v in verdict_dist],
+        "values": [v["count"] for v in verdict_dist],
+        "colors": [v["color"] for v in verdict_dist],
+        "total": total_analyses,
+    }
+
+    # ── Tendances (monthly / weekly / daily) ──────────────────────────────────
+    def _bucket(analyses, fmt):
+        buckets = defaultdict(lambda: {"total": 0, "deepfake": 0, "authentic": 0, "undetermined": 0})
+        for a in analyses:
+            if not a.completed_at:
+                continue
+            if fmt == "daily":
+                k = a.completed_at.strftime("%Y-%m-%d")
+            elif fmt == "weekly":
+                iso = a.completed_at.isocalendar()
+                k = f"{iso[0]}-W{iso[1]:02d}"
+            else:
+                k = a.completed_at.strftime("%Y-%m")
+            buckets[k]["total"] += 1
+            if a.verdict == Verdict.deepfake:
+                buckets[k]["deepfake"] += 1
+            elif a.verdict == Verdict.authentic:
+                buckets[k]["authentic"] += 1
+            else:
+                buckets[k]["undetermined"] += 1
+        return [{"period": k, **buckets[k]} for k in sorted(buckets.keys())[-12:]]
+
+    trends_json = json.dumps({
+        "monthly": _bucket(completed, "monthly"),
+        "weekly":  _bucket(completed, "weekly"),
+        "daily":   _bucket(completed, "daily"),
+    })
+
+    # ── Moteurs ───────────────────────────────────────────────────────────────
+    _ENG = [
+        ("score_video_texture",  "Texture vidéo",      20),
+        ("score_video_temporal", "Cohérence temporelle", 15),
+        ("score_rppg",           "Signal rPPG",         18),
+        ("score_biometrics",     "Biométrie faciale",   10),
+        ("score_audio_model",    "Modèle audio",        20),
+        ("score_audio_phase",    "Phase audio",         10),
+        ("score_metadata",       "Métadonnées",          7),
+    ]
+    engines_data = []
+    for field, label, _w in _ENG:
+        vals = [getattr(a, field) for a in completed if getattr(a, field) is not None]
+        if vals:
+            mean = statistics.mean(vals)
+            color = "#ff4757" if mean >= 0.7 else ("#ffc107" if mean >= 0.5 else "#00e676")
+            engines_data.append({
+                "label": label,
+                "mean_fmt": f"{mean:.2f}",
+                "pct": round(mean * 100, 1),
+                "color": color,
+            })
+        else:
+            engines_data.append({"label": label, "mean_fmt": "—", "pct": 0, "color": "var(--text-dim)"})
+
+    # ── Dossiers ──────────────────────────────────────────────────────────────
+    all_cases = db.query(Case).all()
+    cases_total = len(all_cases)
+    status_counts: dict[str, int] = defaultdict(int)
+    jur_counts: dict[str, int] = defaultdict(int)
+    for c in all_cases:
+        status_counts[c.status.value] += 1
+        jur_counts[c.jurisdiction.value] += 1
+
+    _STATUS_COLORS = {
+        "open": "#00e676", "in_analysis": "#00cba4",
+        "completed": "#5a7a99", "archived": "var(--text-dim)"
+    }
+    by_status = [
+        {"label": k, "count": v, "pct": round(v / cases_total * 100) if cases_total else 0,
+         "color": _STATUS_COLORS.get(k, "var(--accent)")}
+        for k, v in sorted(status_counts.items(), key=lambda x: -x[1])
+    ]
+    by_jurisdiction = [
+        {"label": k, "count": v, "pct": round(v / cases_total * 100) if cases_total else 0}
+        for k, v in sorted(jur_counts.items(), key=lambda x: -x[1])
+    ]
+
+    # ── Dossiers ouverts ──────────────────────────────────────────────────────
+    open_cases = sum(1 for c in all_cases if c.status in (CaseStatus.open, CaseStatus.in_analysis))
+
+    return templates.TemplateResponse(request, "analyst/analytics.html", {
+        "user": user,
+        "total_analyses": total_analyses,
+        "deepfake_count": deepfake_count,
+        "authentic_count": authentic_count,
+        "deepfake_rate": deepfake_rate,
+        "open_cases": open_cases,
+        "verdict_dist": verdict_dist,
+        "verdict_chart_json": json.dumps(verdict_chart),
+        "trends_json": trends_json,
+        "engines": engines_data,
+        "cases_total": cases_total,
+        "by_status": by_status,
+        "by_jurisdiction": by_jurisdiction,
+    })
+
+
 # ── Cases ─────────────────────────────────────────────────────────────────────
 
 @router.get("/cases/new", response_class=HTMLResponse)

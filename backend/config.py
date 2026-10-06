@@ -23,9 +23,10 @@ class Settings(BaseSettings):
     # DB 2 for token blocklist (separate from Celery DBs 0 and 1)
     redis_url: str = "redis://127.0.0.1:6379/2"
 
-    # Encryption at-rest (Fernet symmetric key)
-    # Generate with: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    fernet_key: str = ""
+    # Encryption at-rest (AES-256-GCM)
+    # Generate with: python3 -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+    encryption_key: str = ""
+    fernet_key: str = ""  # DÉPRÉCIÉ — conservé pour migration des données existantes uniquement
 
     # MinIO
     minio_endpoint: str = "minio:9000"
@@ -111,7 +112,7 @@ class Settings(BaseSettings):
 
     @property
     def fernet(self):
-        """Retourne une instance Fernet si fernet_key est configurée, sinon None."""
+        """DÉPRÉCIÉ — conservé pour migration uniquement. Utiliser encryption_key (AES-256-GCM)."""
         if not self.fernet_key:
             return None
         from cryptography.fernet import Fernet

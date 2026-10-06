@@ -131,6 +131,135 @@ class TestIDOR:
         assert resp.status_code in (403, 404)
 
 
+    def test_unauthenticated_cannot_read_analysis(
+        self, client: TestClient, db, admin_user
+    ):
+        """Sans token, toute tentative d'accès à une analyse doit retourner 401."""
+        from models.analysis import Analysis, AnalysisStatus
+        from models.case import Case, CaseStatus, Jurisdiction
+        from datetime import datetime, timezone, timedelta
+
+        admin_case = Case(
+            case_number="UNAUTH-ANAL-001",
+            title="Unauth Analysis Test",
+            jurisdiction=Jurisdiction.federal,
+            status=CaseStatus.open,
+            created_by_id=admin_user.id,
+            retain_until=datetime.now(timezone.utc) + timedelta(days=3650),
+        )
+        db.add(admin_case)
+        db.commit()
+        db.refresh(admin_case)
+
+        analysis = Analysis(
+            case_id=admin_case.id,
+            media_file_id=1,
+            status=AnalysisStatus.pending,
+            requested_by_id=admin_user.id,
+        )
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+
+        resp = client.get(f"/analyze/{analysis.id}")
+        assert resp.status_code == 401
+
+    def test_analyst_cannot_delete_other_case(
+        self, client: TestClient, db, auth_analyst: dict, admin_user
+    ):
+        """Un analyst ne peut pas archiver/supprimer un dossier qu'il ne possède pas."""
+        from models.case import Case, CaseStatus, Jurisdiction
+        from datetime import datetime, timezone, timedelta
+
+        admin_case = Case(
+            case_number="IDOR-DEL-001",
+            title="Delete Protection Test",
+            jurisdiction=Jurisdiction.federal,
+            status=CaseStatus.open,
+            created_by_id=admin_user.id,
+            retain_until=datetime.now(timezone.utc) + timedelta(days=3650),
+        )
+        db.add(admin_case)
+        db.commit()
+        db.refresh(admin_case)
+
+        resp = client.post(f"/cases/{admin_case.id}/archive", headers=auth_analyst)
+        assert resp.status_code in (403, 404)
+
+    def test_analyst_cannot_patch_other_case(
+        self, client: TestClient, db, auth_analyst: dict, admin_user
+    ):
+        """Un analyst ne peut pas modifier un dossier dont il n'est pas le créateur."""
+        from models.case import Case, CaseStatus, Jurisdiction
+        from datetime import datetime, timezone, timedelta
+
+        admin_case = Case(
+            case_number="IDOR-PATCH-001",
+            title="Patch Protection Test",
+            jurisdiction=Jurisdiction.federal,
+            status=CaseStatus.open,
+            created_by_id=admin_user.id,
+            retain_until=datetime.now(timezone.utc) + timedelta(days=3650),
+        )
+        db.add(admin_case)
+        db.commit()
+        db.refresh(admin_case)
+
+        resp = client.patch(
+            f"/cases/{admin_case.id}",
+            json={"title": "Hacked"},
+            headers=auth_analyst,
+        )
+        assert resp.status_code in (403, 404)
+
+    def test_nonexistent_resource_returns_404_not_500(
+        self, client: TestClient, auth_analyst: dict
+    ):
+        """Un ID inexistant (très grand) doit retourner 404, jamais 500."""
+        resp = client.get("/analyze/999999999", headers=auth_analyst)
+        assert resp.status_code in (403, 404)
+
+        resp = client.get("/cases/999999999", headers=auth_analyst)
+        assert resp.status_code == 404
+
+
+class TestMetricsGuard:
+    """Tests de la garde Règle 7 — aucun chiffre de fiabilité sans metrics.json."""
+
+    def test_require_metrics_raises_when_missing(self):
+        """_require_metrics() doit lever ValueError si metrics.json absent."""
+        import unittest.mock as mock
+        import engines.fusion as fusion_module
+
+        with mock.patch("engines.fusion._METRICS_PATH") as mock_path:
+            mock_path.exists.return_value = False
+            mock_path.__str__ = lambda self: "/fake/metrics.json"
+            with pytest.raises(ValueError, match="metrics.json"):
+                fusion_module._require_metrics()
+
+    def test_fusion_result_metrics_available_false_when_no_file(self):
+        """FusionResult.metrics_available doit être False quand metrics.json absent."""
+        from engines.fusion import fuse_scores, _METRICS_PATH
+        import unittest.mock as mock
+
+        with mock.patch("engines.fusion._METRICS_PATH") as m:
+            m.exists.return_value = False
+            result = fuse_scores(score_metadata=0.5)
+        assert result.metrics_available is False
+        assert result.metrics_artifact is None
+
+    def test_fusion_result_metrics_available_true_when_file_exists(self, tmp_path):
+        """FusionResult.metrics_available doit être True quand metrics.json présent."""
+        from engines.fusion import fuse_scores
+        import unittest.mock as mock
+
+        with mock.patch("engines.fusion._METRICS_PATH") as m:
+            m.exists.return_value = True
+            m.__str__ = lambda self: str(tmp_path / "metrics.json")
+            result = fuse_scores(score_metadata=0.5)
+        assert result.metrics_available is True
+
+
 class TestPathTraversal:
     """Les noms de fichiers malveillants ne doivent pas traverser les répertoires."""
 

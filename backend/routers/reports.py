@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 from core.security import require_analyst, require_any
 from database import get_db
 from models.analysis import Analysis, AnalysisStatus
+from models.case import Case
 from models.report import Report
 from models.responses import ANALYST_ERRORS, CRUD_ERRORS, HTTP_401
-from models.user import User
+from models.user import User, UserRole
 
 router = APIRouter(prefix="/reports", tags=["Rapports"])
 
@@ -57,6 +58,13 @@ def generate_report(
     analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analyse introuvable")
+
+    case = db.query(Case).filter(Case.id == analysis.case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Dossier introuvable")
+    if current_user.role != UserRole.admin and case.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Accès refusé — vous n'êtes pas le créateur de ce dossier")
+
     if analysis.status != AnalysisStatus.completed:
         raise HTTPException(status_code=409, detail="L'analyse n'est pas encore terminée")
 
@@ -107,6 +115,13 @@ def download_report(
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Rapport introuvable")
+
+    case = db.query(Case).filter(Case.id == report.case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Dossier introuvable")
+    if current_user.role == UserRole.analyst and case.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Accès refusé — vous n'êtes pas le créateur de ce dossier")
+
     if not report.pdf_path:
         raise HTTPException(status_code=404, detail="Fichier PDF non disponible")
 
@@ -134,6 +149,12 @@ def list_case_reports(
     current_user: Annotated[User, Depends(require_any)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[ReportResponse]:
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Dossier introuvable")
+    if current_user.role == UserRole.analyst and case.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Accès refusé — vous n'êtes pas le créateur de ce dossier")
+
     reports = (
         db.query(Report)
         .filter(Report.case_id == case_id)
@@ -180,6 +201,13 @@ def generate_courtroom(
     analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analyse introuvable")
+
+    case = db.query(Case).filter(Case.id == analysis.case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Dossier introuvable")
+    if current_user.role != UserRole.admin and case.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Accès refusé — vous n'êtes pas le créateur de ce dossier")
+
     if analysis.status != AnalysisStatus.completed:
         raise HTTPException(status_code=409, detail="L'analyse n'est pas encore terminée")
 

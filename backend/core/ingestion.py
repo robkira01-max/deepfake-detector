@@ -115,7 +115,6 @@ def ingest_file(
         status=MediaStatus.verified,
         hash_sha256=bundle.sha256,
         hash_blake3=bundle.blake3,
-        hash_md5=bundle.md5,
         tsa_token_b64=tsa_token_b64,
         tsa_authority=tsa_authority,
         tsa_timestamp=tsa_timestamp,

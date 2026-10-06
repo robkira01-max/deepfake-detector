@@ -214,7 +214,7 @@ class TestKYCGet:
             status=MediaStatus.verified,
             hash_sha256="a" * 64,
             hash_blake3="b" * 64,
-            hash_md5="c" * 32,
+            
             ingested_by_id=user.id,
         )
         db.add(mf)
@@ -274,7 +274,7 @@ class TestKYCGet:
             status=MediaStatus.verified,
             hash_sha256="d" * 64,
             hash_blake3="e" * 64,
-            hash_md5="f" * 32,
+            
             ingested_by_id=analyst_user.id,
         )
         db.add(mf)

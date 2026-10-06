@@ -114,7 +114,7 @@ class TestGetAnalysis:
             file_size_bytes=3244,
             hash_sha256="a" * 64,
             hash_blake3="b" * 64,
-            hash_md5="c" * 32,
+            
             storage_key="/tmp/test.wav",
             ingested_by_id=owner.id,
         )
