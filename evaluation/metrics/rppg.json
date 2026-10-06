@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "engine_name": "rppg",
+  "model_version": "v1.0.0",
+  "protocol_hash": "62a040c86452fb8f5646b080a3cf033b2b69760cad34e9e241b039e91856c4b7",
+  "train_dataset": {
+    "name": "rppg_synthetic_trainset_v1",
+    "version": "1.0",
+    "split": "train",
+    "n_samples": 50,
+    "n_identities": 1,
+    "source_hash": null
+  },
+  "test_dataset": {
+    "name": "rppg_synthetic_testset_v1",
+    "version": "1.0",
+    "split": "test",
+    "n_samples": 100,
+    "n_identities": 50,
+    "source_hash": null
+  },
+  "far": 0.02,
+  "frr": 0.0,
+  "eer": 0.0,
+  "auc": 1.0,
+  "threshold_used": 0.5,
+  "evaluated_at": "2026-10-06T17:40:34.379731Z",
+  "evaluator": "eval_rppg_engine.py (automated)",
+  "evaluation_environment": "Python 3.14.7, numpy, scipy — CPU only, no GPU",
+  "notes": "Algorithme CHROM (de Haan & Jeanne, 2013). Jeu de test synthétique N=100 (50 authentiques BPM 60-100 avec signal différentiel R/G; 50 deepfakes modèle illumination uniforme, hors bande cardiaque). Seuil 0.5 (score = 1 − tanh(SNR/5)). Comportement observé : CHROM annule les variations proportionnelles (deepfake), préserve le signal différentiel cardiaque (authentique). Limite principale : deepfakes produisant accidentellement un différentiel R/G dans la bande cardiaque ne sont pas détectés (cas non couverts par ce jeu synthétique). Données synthétiques — validité sur vidéos réelles à établir sur FaceForensics++/DFDC (licences non-commerciales — nécessite décision propriétaire)."
+}

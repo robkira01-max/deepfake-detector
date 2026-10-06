@@ -1,7 +1,7 @@
 """Porte de validation des moteurs — CLAUDE.md Règle 10.
 
 Un engine ne peut passer à 'validated' que si les 4 conditions sont réunies :
-  1. evaluation/metrics/metrics.json existe et est valide pour cet engine
+  1. evaluation/metrics/{engine_name}.json (ou metrics.json en fallback) valide
   2. evaluation/model_cards/{engine_name}.md existe et est substantielle
   3. evaluation/protocols/baseline_protocol.yaml a status != 'draft'
   4. AuditLog contient une entrée ENGINE_STATUS_CHANGED action=approved pour cet engine
@@ -13,9 +13,23 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 _EVAL_ROOT = Path(__file__).resolve().parents[2] / "evaluation"
-_METRICS_PATH = _EVAL_ROOT / "metrics" / "metrics.json"
+_METRICS_DIR = _EVAL_ROOT / "metrics"
+_METRICS_PATH = _METRICS_DIR / "metrics.json"          # legacy — metadata engine
 _PROTOCOL_PATH = _EVAL_ROOT / "protocols" / "baseline_protocol.yaml"
 _MODEL_CARDS_DIR = _EVAL_ROOT / "model_cards"
+
+
+def _metrics_path_for(engine_name: str) -> Path:
+    """Retourne le chemin du fichier de métriques pour un engine donné.
+
+    Lookup order:
+      1. evaluation/metrics/{engine_name}.json  (fichier per-engine)
+      2. evaluation/metrics/metrics.json        (legacy — metadata engine)
+    """
+    per_engine = _METRICS_DIR / f"{engine_name}.json"
+    if per_engine.exists():
+        return per_engine
+    return _METRICS_PATH
 
 VALID_ENGINES = frozenset({
     "texture", "temporal", "rppg", "biometrics",
@@ -91,33 +105,40 @@ class EngineValidationGate:
 
 
 def _check_metrics(engine_name: str, reasons: list[str]) -> tuple[bool, Path | None]:
-    """Condition 1 : metrics.json valide pour cet engine."""
-    if not _METRICS_PATH.exists():
+    """Condition 1 : fichier de métriques valide pour cet engine.
+
+    Cherche evaluation/metrics/{engine_name}.json en premier,
+    puis evaluation/metrics/metrics.json (compat. legacy).
+    """
+    path = _metrics_path_for(engine_name)
+    if not path.exists():
         reasons.append(
-            "evaluation/metrics/metrics.json absent. "
+            f"Fichier de métriques absent pour '{engine_name}'. "
+            f"Attendu : evaluation/metrics/{engine_name}.json "
+            "(ou evaluation/metrics/metrics.json en fallback). "
             "Voir evaluation/protocols/baseline_protocol.yaml pour la procédure."
         )
         return False, None
 
     try:
-        data = json.loads(_METRICS_PATH.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        reasons.append(f"metrics.json illisible : {exc}")
+        reasons.append(f"{path.name} illisible : {exc}")
         return False, None
 
     if data.get("engine_name") != engine_name:
         reasons.append(
-            f"metrics.json référence l'engine '{data.get('engine_name')}', "
+            f"{path.name} référence l'engine '{data.get('engine_name')}', "
             f"pas '{engine_name}'."
         )
-        return False, _METRICS_PATH
+        return False, path
 
     for required in _METRICS_REQUIRED_FIELDS:
         if data.get(required) is None:
-            reasons.append(f"metrics.json manque le champ requis '{required}'.")
-            return False, _METRICS_PATH
+            reasons.append(f"{path.name} manque le champ requis '{required}'.")
+            return False, path
 
-    return True, _METRICS_PATH
+    return True, path
 
 
 def _check_model_card(engine_name: str, reasons: list[str]) -> tuple[bool, Path | None]:

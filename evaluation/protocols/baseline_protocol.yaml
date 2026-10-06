@@ -46,10 +46,33 @@ approval_required:
   - metrics_json: true
 
 notes: >
-  DRAFT — protocole non encore appliqué. Aucun engine n'est actuellement validé.
-  Ce fichier définit les critères futurs de validation.
+  Protocole partiellement appliqué (metadata 2026-10-05, rppg 2026-10-06).
+  Aucun engine n'est encore en statut 'validated' — approbation humaine manquante (condition 4).
+  Ce fichier définit les critères de validation et trace les applications.
 
 applied_to:
+  rppg:
+    status: "applied"
+    date: "2026-10-06"
+    evaluator: "eval_rppg_engine.py (automated)"
+    metrics_file: "evaluation/metrics/rppg.json"
+    metrics_sha256: "2a42a578baa93bec528de862ed8cda20ad223fc3c3ebbc0e48fa33458a9d4c58"
+    n_samples: 100
+    n_samples_note: "Algorithme déterministe (pas de ML). N=100 synthétique — dérogation vs 1000 réel. Données réelles (FaceForensics++/DFDC) bloquées par licences non-commerciales."
+    results:
+      threshold: 0.5
+      tp: 50
+      fp: 1
+      tn: 49
+      fn: 0
+      precision: 0.9804
+      recall: 1.0000
+      f1: 0.9901
+      far: 0.0200
+      frr: 0.0000
+      auc: 1.0000
+      eer: 0.0000
+    next_step: "Approbation humaine via POST /models/engines/rppg/approve"
   metadata:
     status: "applied"
     date: "2026-10-05"

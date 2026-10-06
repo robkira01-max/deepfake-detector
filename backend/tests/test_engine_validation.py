@@ -80,7 +80,7 @@ class TestValidationGate:
             result = EngineValidationGate.check("metadata", MagicMock())
         assert result.metrics_ok is False
         assert result.can_promote is False
-        assert any("metrics.json absent" in r for r in result.blocking_reasons)
+        assert any("absent" in r and "metrics" in r for r in result.blocking_reasons)
 
     def test_wrong_engine_in_metrics_blocks(self, tmp_path):
         from engines.validation_gate import EngineValidationGate
