@@ -46,7 +46,7 @@ approval_required:
   - metrics_json: true
 
 notes: >
-  Protocole partiellement appliqué (metadata 2026-10-05, rppg 2026-10-06).
+  Protocole partiellement appliqué (metadata 2026-10-05, rppg 2026-10-06, biometrics 2026-10-06).
   Aucun engine n'est encore en statut 'validated' — approbation humaine manquante (condition 4).
   Ce fichier définit les critères de validation et trace les applications.
 
@@ -95,3 +95,26 @@ applied_to:
       auc: 0.9590
       eer: 0.0875
     next_step: "Approbation humaine via POST /models/engines/metadata/approve"
+
+  biometrics:
+    status: "applied"
+    date: "2026-10-06"
+    evaluator: "eval_biometrics_engine.py (automated)"
+    metrics_file: "evaluation/metrics/biometrics.json"
+    metrics_sha256: "0e193cd91bf553611000a502eeda256808fa045e71b6791b97c80ac0540ca6cb"
+    n_samples: 100
+    n_samples_note: "Algorithme déterministe (pas de ML). N=100 synthétique — dérogation vs 1000 réel. Données réelles (FaceForensics++/DFDC) bloquées par licences non-commerciales."
+    results:
+      threshold: 0.5
+      tp: 50
+      fp: 0
+      tn: 50
+      fn: 0
+      precision: 1.0000
+      recall: 1.0000
+      f1: 1.0000
+      far: 0.0000
+      frr: 0.0000
+      auc: 1.0000
+      eer: 0.0000
+    next_step: "Approbation humaine via POST /models/engines/biometrics/approve"

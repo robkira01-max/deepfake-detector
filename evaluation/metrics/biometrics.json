@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "engine_name": "biometrics",
+  "model_version": "v1.0.0",
+  "protocol_hash": "fbebd0e03882bf02b504b258db796f717a1e9798e849ff91f96bee2e99031587",
+  "train_dataset": {
+    "name": "biometrics_synthetic_trainset_v1",
+    "version": "1.0",
+    "split": "train",
+    "n_samples": 50,
+    "n_identities": 1,
+    "source_hash": null
+  },
+  "test_dataset": {
+    "name": "biometrics_synthetic_testset_v1",
+    "version": "1.0",
+    "split": "test",
+    "n_samples": 100,
+    "n_identities": 50,
+    "source_hash": null
+  },
+  "far": 0.0,
+  "frr": 0.0,
+  "eer": 0.0,
+  "auc": 1.0,
+  "threshold_used": 0.5,
+  "evaluated_at": "2026-10-06T21:31:38.193318Z",
+  "evaluator": "eval_biometrics_engine.py (automated)",
+  "evaluation_environment": "Python 3.14.7, numpy — CPU only, no GPU",
+  "notes": "Algorithme EAR + comptage de clignements (VideoEngine._analyze_biometrics). Jeu de test synthétique N=100 (50 authentiques taux 15-20 blinks/min; 30 deepfakes type A : 0 blink total, rate < 3/min → score=0.85; 20 deepfakes type B : clignements rapides ~300/min → score=0.55). Seuil de décision 0.5. Limite principale : deepfakes récents (NeRF, diffusion) peuvent avoir un taux de clignement normal (7-30/min) et ne pas être détectés par ce moteur. Données synthétiques — validité sur vidéos réelles à établir sur FaceForensics++/DFDC (licences non-commerciales — nécessite décision propriétaire)."
+}
